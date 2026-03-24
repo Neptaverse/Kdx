@@ -24,36 +24,46 @@ Repository: `https://github.com/Neptaverse/Kdx.git`
 git clone https://github.com/Neptaverse/Kdx.git
 cd Kdx
 
-./bin/setup-venv.sh
-
-.venv/bin/kdx
+python bootstrap.py
 ```
 
 On the first run, KDX will initialize its local workspace data automatically.
 
-This avoids Conda or shell aliases hijacking `pip` or `python`.
+This keeps the setup flow inside Python and avoids shell-specific `.venv/bin/...` or `.venv\\Scripts\\...` paths.
+
+If `python` is not the right launcher on your machine, use the platform equivalent:
+
+- Windows: `py -3 bootstrap.py`
+- macOS/Linux with a `python3`-only install: `python3 bootstrap.py`
 
 If you are inside Conda and the install still misbehaves, run `conda deactivate` first, then run the same setup commands again.
 
 If you already have a broken environment, reset it fully:
 
 ```bash
-rm -rf .venv
-./bin/setup-venv.sh
+python bootstrap.py --reset --setup-only
 ```
 
-`setup-venv.sh` intentionally keeps the packaging toolchain below the current `pip 26` line because that release has caused editable-install failures in some environments.
+`bootstrap.py` intentionally keeps the packaging toolchain below the current `pip 26` line because that release has caused editable-install failures in some environments.
+
+If the script fails with a PyPI `ReadTimeoutError`, that is just a network timeout while downloading packages. Run it again:
+
+```bash
+python bootstrap.py --setup-only
+```
+
+The bootstrap flow already uses a longer pip timeout and retry budget by default.
 
 ## Common Commands
 
 ```bash
-.venv/bin/kdx
-.venv/bin/kdx "fix the auth retry path and check the latest SDK docs"
-.venv/bin/kdx scan
-.venv/bin/kdx plan "where is the Keiro client implemented?"
-.venv/bin/kdx search "latest FastMCP docs"
-.venv/bin/kdx tokens "where is the Keiro client implemented? reply with the path only."
-.venv/bin/kdx update
+python bootstrap.py
+python bootstrap.py "fix the auth retry path and check the latest SDK docs"
+python bootstrap.py scan
+python bootstrap.py plan "where is the Keiro client implemented?"
+python bootstrap.py search "latest FastMCP docs"
+python bootstrap.py tokens "where is the Keiro client implemented? reply with the path only."
+python bootstrap.py update
 ```
 
 ## What’s Different
@@ -65,6 +75,7 @@ Compared with plain Codex CLI, KDX adds a few opinionated pieces:
 - explicit local/external/hybrid routing instead of one generic prompt shape
 - token benchmarking against vanilla Codex on the same prompts
 - GitHub-backed update checks for the KDX wrapper itself
+- a Python-first bootstrap flow that works the same way on macOS, Windows, and Linux
 
 ## How It Works
 
@@ -110,7 +121,7 @@ KDX can read the Keiro API key from either:
 The easiest setup is:
 
 ```bash
-.venv/bin/kdx /keiro keiro_your_api_key_here
+python bootstrap.py /keiro keiro_your_api_key_here
 ```
 
 The persisted config is stored outside the repo and is written with private file permissions.
@@ -120,9 +131,9 @@ The persisted config is stored outside the repo and is written with private file
 KDX can check GitHub for newer versions of the project and update the current clone:
 
 ```bash
-.venv/bin/kdx update
-.venv/bin/kdx update --check
-.venv/bin/kdx update --check-now
+python bootstrap.py update
+python bootstrap.py update --check
+python bootstrap.py update --check-now
 ```
 
 `kdx update` applies the update by default.
@@ -138,7 +149,7 @@ The check is intentionally lightweight:
 Rollback stays explicit:
 
 ```bash
-.venv/bin/kdx update --rollback v0.1.0
+python bootstrap.py update --rollback v0.1.0
 ```
 
 ## Local State
@@ -155,8 +166,8 @@ The repo-local `.kdx/` directory is intentionally ignored and should not be comm
 KDX includes a direct benchmark against vanilla Codex:
 
 ```bash
-.venv/bin/kdx tokens "where is the Keiro client implemented? reply with the path only."
-.venv/bin/kdx tokens --prompts-file bench/prompts_kdx_repo.txt --json
+python bootstrap.py tokens "where is the Keiro client implemented? reply with the path only."
+python bootstrap.py tokens --prompts-file bench/prompts_kdx_repo.txt --json
 ```
 
 This uses real `codex exec --json` runs and reads `turn.completed.usage`, so the numbers come from actual model usage rather than local estimates.
@@ -164,8 +175,9 @@ This uses real `codex exec --json` runs and reads `turn.completed.usage`, so the
 ## Development
 
 ```bash
-.venv/bin/python -m unittest discover -s tests -v
-.venv/bin/python -m compileall src/kdx
+python bootstrap.py --setup-only
+python bootstrap.py --python -m unittest discover -s tests -v
+python bootstrap.py --python -m compileall src/kdx
 ```
 
 ## Project Layout

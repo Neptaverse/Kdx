@@ -75,8 +75,8 @@ def _ensure_mcp_runtime() -> None:
     if importlib.util.find_spec("mcp") is not None:
         return
     raise RuntimeError(
-        "Missing runtime dependency `mcp`. Create a local virtualenv and install KDX there: "
-        "`python3 -m venv .venv && . .venv/bin/activate && pip install -e .`"
+        "Missing runtime dependency `mcp`. Bootstrap KDX first with "
+        "`python bootstrap.py --setup-only`."
     )
 
 

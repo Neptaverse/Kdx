@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 import os
 import re
-import shutil
 import subprocess
+import sys
 import urllib.error
 import urllib.request
 from datetime import datetime, timedelta, timezone
@@ -102,9 +102,9 @@ def update_actions(status: dict[str, Any]) -> dict[str, str]:
     latest = str(status.get("latest_version") or "").strip()
     current = str(status.get("current_version") or __version__).strip()
     return {
-        "update": "git pull --ff-only && rm -rf .venv && ./bin/setup-venv.sh",
-        "rollback": f"git fetch --tags && git checkout v{current.lstrip('v')} && rm -rf .venv && ./bin/setup-venv.sh",
-        "install_latest_tag": f"git fetch --tags && git checkout v{latest.lstrip('v')} && rm -rf .venv && ./bin/setup-venv.sh" if latest else "",
+        "update": "git pull --ff-only && python bootstrap.py --setup-only",
+        "rollback": f"git fetch --tags && git checkout v{current.lstrip('v')} && python bootstrap.py --setup-only",
+        "install_latest_tag": f"git fetch --tags && git checkout v{latest.lstrip('v')} && python bootstrap.py --setup-only" if latest else "",
     }
 
 
@@ -119,10 +119,7 @@ def apply_update(settings: KdxSettings, *, rollback_ref: str = "") -> dict[str, 
         _run(settings, ["git", "-C", str(settings.repo_root), "checkout", rollback_ref.strip()])
     else:
         _run(settings, ["git", "-C", str(settings.repo_root), "pull", "--ff-only"])
-    venv_path = settings.repo_root / ".venv"
-    if venv_path.exists():
-        shutil.rmtree(venv_path)
-    _run(settings, [str(settings.repo_root / "bin" / "setup-venv.sh")])
+    _run(settings, [sys.executable, str(settings.repo_root / "bootstrap.py"), "--setup-only"])
     return {
         "repo_root": str(settings.repo_root),
         "rollback_ref": rollback_ref.strip(),

@@ -76,6 +76,8 @@ class UpdateTests(unittest.TestCase):
         self.assertIn("update", actions)
         self.assertIn("rollback", actions)
         self.assertNotIn("stay", actions)
+        self.assertIn("bootstrap.py", actions["update"])
+        self.assertIn("bootstrap.py", actions["rollback"])
 
 
 def _settings_for(temp_dir: Path) -> KdxSettings:

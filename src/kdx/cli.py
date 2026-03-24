@@ -215,7 +215,7 @@ def _cmd_update(args: argparse.Namespace) -> int:
     print(f"updated KDX in {result['repo_root']}")
     if latest:
         print(f"target: {latest}")
-    print("restart with: .venv/bin/kdx")
+    print("restart with: python bootstrap.py")
     return 0
 
 
