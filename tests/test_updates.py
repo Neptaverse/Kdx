@@ -7,7 +7,7 @@ from pathlib import Path
 
 from kdx.budget import BudgetConfig
 from kdx.config import KdxSettings
-from kdx.updates import check_for_updates, format_update_notice, normalize_version_tag
+from kdx.updates import check_for_updates, format_update_notice, normalize_version_tag, update_actions
 
 
 class UpdateTests(unittest.TestCase):
@@ -70,6 +70,12 @@ class UpdateTests(unittest.TestCase):
             )
             self.assertEqual(status["latest_commit"], "abc123")
             self.assertTrue("current_commit" in status)
+
+    def test_update_actions_do_not_expose_stay_option(self) -> None:
+        actions = update_actions({"current_version": "0.1.0", "latest_version": "0.2.0"})
+        self.assertIn("update", actions)
+        self.assertIn("rollback", actions)
+        self.assertNotIn("stay", actions)
 
 
 def _settings_for(temp_dir: Path) -> KdxSettings:

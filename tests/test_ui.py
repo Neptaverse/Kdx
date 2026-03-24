@@ -58,6 +58,7 @@ class UiTests(unittest.TestCase):
         output = stream.getvalue()
         self.assertIn("KEIRO: not configured", output)
         self.assertIn("kdx /keiro <api-key>", output)
+        self.assertIn("keirolabs.cloud", output)
         self.assertIn("\033[38;5;196m", output)
 
     def test_launch_panel_shows_update_notice(self) -> None:

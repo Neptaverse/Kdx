@@ -114,7 +114,11 @@ def render_startup_status(repo_root: Path, *, file_count: int | None, keiro_conf
     if keiro_configured:
         keiro_line = _paint("KEIRO: ready", _SUCCESS_COLOR, enabled=color)
     else:
-        keiro_line = _paint("KEIRO: not configured | run `kdx /keiro <api-key>`", _WARNING_COLOR, enabled=color)
+        keiro_line = _paint(
+            "KEIRO: not configured | get a key at https://www.keirolabs.cloud and run `kdx /keiro <api-key>`",
+            _WARNING_COLOR,
+            enabled=color,
+        )
     return "\n".join([repo_line, keiro_line])
 
 

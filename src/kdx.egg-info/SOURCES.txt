@@ -15,6 +15,7 @@ src/kdx/retrieval.py
 src/kdx/search_service.py
 src/kdx/token_compare.py
 src/kdx/ui.py
+src/kdx/updates.py
 src/kdx/wrapper.py
 src/kdx.egg-info/PKG-INFO
 src/kdx.egg-info/SOURCES.txt
@@ -30,4 +31,5 @@ tests/test_keiro.py
 tests/test_search_service.py
 tests/test_token_compare.py
 tests/test_ui.py
+tests/test_updates.py
 tests/test_wrapper.py

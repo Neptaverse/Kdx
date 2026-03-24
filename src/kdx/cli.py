@@ -10,7 +10,7 @@ from kdx.config import clear_keiro_api_key, load_settings, set_keiro_api_key
 from kdx.indexer import scan_project
 from kdx.keiro import KeiroClient, KeiroError, normalize_results
 from kdx.token_compare import compare_prompt_tokens, compare_prompts_file
-from kdx.updates import check_for_updates, update_actions
+from kdx.updates import apply_update, check_for_updates, update_actions
 from kdx.wrapper import build_execution_plan, format_plan, run_codex
 
 SUBCOMMANDS = {"scan", "plan", "search", "run", "keiro", "tokens", "update"}
@@ -172,38 +172,50 @@ def _cmd_tokens(args: argparse.Namespace) -> int:
 
 def _cmd_update(args: argparse.Namespace) -> int:
     settings = load_settings()
-    status = check_for_updates(settings, force=args.check_now)
+    status = check_for_updates(settings, force=args.check_now or args.check)
     actions = update_actions(status)
-    payload = {
-        "status": status,
-        "actions": actions,
-    }
-    if args.json:
-        _print_json(payload)
+    if args.check or args.json:
+        payload = {
+            "status": status,
+            "actions": actions,
+        }
+        if args.json:
+            _print_json(payload)
+        else:
+            print(f"current: {status['current_version']}")
+            if status.get("latest_version"):
+                print(f"latest:  {status['latest_version']}")
+            elif status.get("latest_commit"):
+                print(f"latest commit: {status['latest_commit'][:12]}")
+            if status.get("update_available"):
+                print("status:  update available")
+            elif status.get("ok"):
+                print("status:  up to date")
+            else:
+                print("status:  could not check")
+            if status.get("release_url"):
+                print(f"source:  {status['release_url']}")
+            if status.get("error"):
+                print(f"note:    {status['error']}")
+            print("")
+            print("update:")
+            print(f"  {actions['update']}")
+            print("rollback:")
+            print(f"  {actions['rollback']}")
         return 0
-    print(f"current: {status['current_version']}")
-    if status.get("latest_version"):
-        print(f"latest:  {status['latest_version']}")
-    if status.get("update_available"):
-        print("status:  update available")
-    elif status.get("ok"):
-        print("status:  up to date")
-    else:
-        print("status:  could not check")
-    if status.get("release_url"):
-        print(f"release: {status['release_url']}")
-    if status.get("error"):
-        print(f"note:    {status['error']}")
-    print("")
-    print("update:")
-    print(f"  {actions['update']}")
-    if actions.get("install_latest_tag"):
-        print("install latest tag:")
-        print(f"  {actions['install_latest_tag']}")
-    print("rollback:")
-    print(f"  {actions['rollback']}")
-    print("stay:")
-    print(f"  {actions['stay']}")
+    if args.rollback:
+        result = apply_update(settings, rollback_ref=args.rollback)
+        print(f"rolled back KDX in {result['repo_root']} to {args.rollback}")
+        return 0
+    if not status.get("update_available"):
+        print("KDX is already up to date.")
+        return 0
+    result = apply_update(settings)
+    latest = status.get("latest_version") or status.get("latest_commit", "")[:12]
+    print(f"updated KDX in {result['repo_root']}")
+    if latest:
+        print(f"target: {latest}")
+    print("restart with: .venv/bin/kdx")
     return 0
 
 
@@ -260,8 +272,10 @@ def build_parser() -> argparse.ArgumentParser:
     tokens.add_argument("--json", action="store_true")
     tokens.set_defaults(func=_cmd_tokens)
 
-    update = subparsers.add_parser("update", help="check GitHub for a newer tagged KDX version")
+    update = subparsers.add_parser("update", help="update the current KDX git clone from GitHub")
+    update.add_argument("--check", action="store_true", help="check for updates without applying them")
     update.add_argument("--check-now", action="store_true", help="ignore the local update cache and check GitHub now")
+    update.add_argument("--rollback", help="checkout a git ref or tag and reinstall KDX there")
     update.add_argument("--json", action="store_true")
     update.set_defaults(func=_cmd_update)
 

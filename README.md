@@ -26,7 +26,6 @@ cd Kdx
 
 ./bin/setup-venv.sh
 
-.venv/bin/kdx /keiro keiro_your_api_key_here
 .venv/bin/kdx
 ```
 
@@ -56,6 +55,16 @@ rm -rf .venv
 .venv/bin/kdx tokens "where is the Keiro client implemented? reply with the path only."
 .venv/bin/kdx update
 ```
+
+## What’s Different
+
+Compared with plain Codex CLI, KDX adds a few opinionated pieces:
+
+- a repo-local index that biases the model toward source files and symbol matches
+- a separate web path for freshness-sensitive work through Keiro
+- explicit local/external/hybrid routing instead of one generic prompt shape
+- token benchmarking against vanilla Codex on the same prompts
+- GitHub-backed update checks for the KDX wrapper itself
 
 ## How It Works
 
@@ -90,6 +99,8 @@ KDX launches the real `codex` binary with:
 
 ## Keiro Setup
 
+If you want web search and doc lookups, get a Keiro key from `https://www.keirolabs.cloud`.
+
 KDX can read the Keiro API key from either:
 
 - `~/.kdx/config.json`
@@ -106,12 +117,15 @@ The persisted config is stored outside the repo and is written with private file
 
 ## Updates
 
-KDX can check GitHub for newer tagged versions of the project:
+KDX can check GitHub for newer versions of the project and update the current clone:
 
 ```bash
 .venv/bin/kdx update
+.venv/bin/kdx update --check
 .venv/bin/kdx update --check-now
 ```
+
+`kdx update` applies the update by default.
 
 Interactive startup also performs a cached update check and shows a short notice when a newer version is available.
 
@@ -121,12 +135,11 @@ The check is intentionally lightweight:
 - cached locally in `~/.kdx/update-check.json`
 - disabled with `KDX_NO_UPDATE_CHECK=1`
 
-`kdx update` prints commands for:
+Rollback stays explicit:
 
-- updating the current clone
-- checking out the latest known tag
-- rolling back to the currently installed version
-- staying on the current version
+```bash
+.venv/bin/kdx update --rollback v0.1.0
+```
 
 ## Local State
 

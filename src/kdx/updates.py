@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import urllib.error
 import urllib.request
@@ -104,7 +105,28 @@ def update_actions(status: dict[str, Any]) -> dict[str, str]:
         "update": "git pull --ff-only && rm -rf .venv && ./bin/setup-venv.sh",
         "rollback": f"git fetch --tags && git checkout v{current.lstrip('v')} && rm -rf .venv && ./bin/setup-venv.sh",
         "install_latest_tag": f"git fetch --tags && git checkout v{latest.lstrip('v')} && rm -rf .venv && ./bin/setup-venv.sh" if latest else "",
-        "stay": "do nothing",
+    }
+
+
+def apply_update(settings: KdxSettings, *, rollback_ref: str = "") -> dict[str, Any]:
+    if not (settings.repo_root / ".git").exists():
+        raise RuntimeError("auto update requires a git clone")
+    dirty = _git_output(settings, ["status", "--short"])
+    if dirty.strip():
+        raise RuntimeError("refusing to update because the repo has local changes")
+    _run(settings, ["git", "-C", str(settings.repo_root), "fetch", "--tags", "--prune"])
+    if rollback_ref.strip():
+        _run(settings, ["git", "-C", str(settings.repo_root), "checkout", rollback_ref.strip()])
+    else:
+        _run(settings, ["git", "-C", str(settings.repo_root), "pull", "--ff-only"])
+    venv_path = settings.repo_root / ".venv"
+    if venv_path.exists():
+        shutil.rmtree(venv_path)
+    _run(settings, [str(settings.repo_root / "bin" / "setup-venv.sh")])
+    return {
+        "repo_root": str(settings.repo_root),
+        "rollback_ref": rollback_ref.strip(),
+        "current_commit": current_commit(settings),
     }
 
 
@@ -270,3 +292,23 @@ def current_commit(settings: KdxSettings) -> str:
     if result.returncode != 0:
         return ""
     return result.stdout.strip()
+
+
+def _git_output(settings: KdxSettings, args: list[str]) -> str:
+    result = subprocess.run(
+        ["git", "-C", str(settings.repo_root), *args],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.stdout
+
+
+def _run(settings: KdxSettings, command: list[str]) -> None:
+    result = subprocess.run(
+        command,
+        cwd=str(settings.repo_root),
+        check=False,
+    )
+    if result.returncode != 0:
+        raise RuntimeError(f"command failed: {' '.join(command)}")
