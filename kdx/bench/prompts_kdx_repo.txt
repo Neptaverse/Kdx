@@ -1,0 +1,4 @@
+How does KDX launch Codex with its own MCP servers? Name the main files and keep the answer brief. Do not edit files.
+Where does KDX decide whether a query is local, external, or hybrid, and how is that routed into the final prompt? Keep the answer brief. Do not edit files.
+How does the Keiro client choose which endpoint to call for a normal search versus docs/news oriented queries? Keep the answer brief. Do not edit files.
+Which test files validate budgeting, indexing/retrieval, and temporary Codex home generation? Keep the answer brief. Do not edit files.
