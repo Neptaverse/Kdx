@@ -16,6 +16,7 @@ Repository: `https://github.com/Neptaverse/Kdx.git`
 - Uses Keiro for docs, release notes, research, and other freshness-sensitive lookups
 - Starts Codex with KDX repo and web MCP tools already attached
 - Includes a `kdx tokens` command to compare KDX against vanilla Codex on real prompts
+- Checks GitHub for newer tagged releases and shows a cached startup notice when one is available
 
 ## Quick Start
 
@@ -33,6 +34,17 @@ On the first run, KDX will initialize its local workspace data automatically.
 
 This avoids Conda or shell aliases hijacking `pip` or `python`.
 
+If you are inside Conda and the install still misbehaves, run `conda deactivate` first, then run the same setup commands again.
+
+If you already have a broken environment, reset it fully:
+
+```bash
+rm -rf .venv
+./bin/setup-venv.sh
+```
+
+`setup-venv.sh` intentionally keeps the packaging toolchain below the current `pip 26` line because that release has caused editable-install failures in some environments.
+
 ## Common Commands
 
 ```bash
@@ -42,6 +54,7 @@ This avoids Conda or shell aliases hijacking `pip` or `python`.
 .venv/bin/kdx plan "where is the Keiro client implemented?"
 .venv/bin/kdx search "latest FastMCP docs"
 .venv/bin/kdx tokens "where is the Keiro client implemented? reply with the path only."
+.venv/bin/kdx update
 ```
 
 ## How It Works
@@ -90,6 +103,30 @@ The easiest setup is:
 ```
 
 The persisted config is stored outside the repo and is written with private file permissions.
+
+## Updates
+
+KDX can check GitHub for newer tagged versions of the project:
+
+```bash
+.venv/bin/kdx update
+.venv/bin/kdx update --check-now
+```
+
+Interactive startup also performs a cached update check and shows a short notice when a newer version is available.
+
+The check is intentionally lightweight:
+
+- GitHub-backed
+- cached locally in `~/.kdx/update-check.json`
+- disabled with `KDX_NO_UPDATE_CHECK=1`
+
+`kdx update` prints commands for:
+
+- updating the current clone
+- checking out the latest known tag
+- rolling back to the currently installed version
+- staying on the current version
 
 ## Local State
 

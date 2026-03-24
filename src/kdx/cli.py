@@ -10,9 +10,10 @@ from kdx.config import clear_keiro_api_key, load_settings, set_keiro_api_key
 from kdx.indexer import scan_project
 from kdx.keiro import KeiroClient, KeiroError, normalize_results
 from kdx.token_compare import compare_prompt_tokens, compare_prompts_file
+from kdx.updates import check_for_updates, update_actions
 from kdx.wrapper import build_execution_plan, format_plan, run_codex
 
-SUBCOMMANDS = {"scan", "plan", "search", "run", "keiro", "tokens"}
+SUBCOMMANDS = {"scan", "plan", "search", "run", "keiro", "tokens", "update"}
 
 
 def _print_json(payload: dict[str, Any]) -> None:
@@ -169,6 +170,43 @@ def _cmd_tokens(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_update(args: argparse.Namespace) -> int:
+    settings = load_settings()
+    status = check_for_updates(settings, force=args.check_now)
+    actions = update_actions(status)
+    payload = {
+        "status": status,
+        "actions": actions,
+    }
+    if args.json:
+        _print_json(payload)
+        return 0
+    print(f"current: {status['current_version']}")
+    if status.get("latest_version"):
+        print(f"latest:  {status['latest_version']}")
+    if status.get("update_available"):
+        print("status:  update available")
+    elif status.get("ok"):
+        print("status:  up to date")
+    else:
+        print("status:  could not check")
+    if status.get("release_url"):
+        print(f"release: {status['release_url']}")
+    if status.get("error"):
+        print(f"note:    {status['error']}")
+    print("")
+    print("update:")
+    print(f"  {actions['update']}")
+    if actions.get("install_latest_tag"):
+        print("install latest tag:")
+        print(f"  {actions['install_latest_tag']}")
+    print("rollback:")
+    print(f"  {actions['rollback']}")
+    print("stay:")
+    print(f"  {actions['stay']}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="kdx", description="Token-efficient Codex wrapper with repo indexing and Keiro search")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -221,6 +259,11 @@ def build_parser() -> argparse.ArgumentParser:
     tokens.add_argument("--timeout", type=int, default=900, help="timeout per variant run in seconds")
     tokens.add_argument("--json", action="store_true")
     tokens.set_defaults(func=_cmd_tokens)
+
+    update = subparsers.add_parser("update", help="check GitHub for a newer tagged KDX version")
+    update.add_argument("--check-now", action="store_true", help="ignore the local update cache and check GitHub now")
+    update.add_argument("--json", action="store_true")
+    update.set_defaults(func=_cmd_update)
 
     return parser
 

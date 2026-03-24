@@ -131,6 +131,7 @@ def print_launch_panel(
     *,
     file_count: int | None,
     keiro_configured: bool,
+    update_notice: str = "",
     stream: TextIO | None = None,
     environ: dict[str, str] | None = None,
 ) -> None:
@@ -138,5 +139,8 @@ def print_launch_panel(
     color = _should_colorize(target, environ=environ)
     print_banner(target, environ=environ)
     target.write(render_startup_status(repo_root, file_count=file_count, keiro_configured=keiro_configured, color=color))
+    if update_notice:
+        target.write("\n")
+        target.write(_paint(update_notice, _WARNING_COLOR, enabled=color))
     target.write("\n\n")
     target.flush()

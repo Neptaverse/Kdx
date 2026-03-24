@@ -60,6 +60,20 @@ class UiTests(unittest.TestCase):
         self.assertIn("kdx /keiro <api-key>", output)
         self.assertIn("\033[38;5;196m", output)
 
+    def test_launch_panel_shows_update_notice(self) -> None:
+        stream = _FakeStream(is_tty=True)
+        print_launch_panel(
+            Path("/tmp/demo"),
+            file_count=42,
+            keiro_configured=True,
+            update_notice="UPDATE: 0.2.0 available (current 0.1.0) | run `kdx update`",
+            stream=stream,
+            environ={"KDX_COLOR": "always"},
+        )
+        output = stream.getvalue()
+        self.assertIn("UPDATE: 0.2.0 available", output)
+        self.assertIn("kdx update", output)
+
 
 if __name__ == "__main__":
     unittest.main()

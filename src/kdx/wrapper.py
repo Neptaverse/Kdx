@@ -26,6 +26,7 @@ from kdx.retrieval import (
 )
 from kdx.search_service import execute_context_search, render_web_evidence_block
 from kdx.ui import print_launch_panel, should_render_banner
+from kdx.updates import check_for_updates, format_update_notice, should_check_for_updates
 
 STRONG_WEB_TERMS = {
     "latest",
@@ -239,10 +240,15 @@ def run_codex(query: str, *, exec_mode: bool = False, use_web: bool | None = Non
         if plan["prompt"]:
             command.append(plan["prompt"])
         if should_render_banner(exec_mode=exec_mode, environ=env):
+            update_notice = ""
+            if should_check_for_updates(env):
+                status = check_for_updates(settings, environ=env)
+                update_notice = format_update_notice(status)
             print_launch_panel(
                 settings.repo_root,
                 file_count=index.file_count if index is not None else None,
                 keiro_configured=bool(settings.keiro_api_key),
+                update_notice=update_notice,
                 environ=env,
             )
         process = subprocess.run(command, cwd=settings.repo_root, env=env, check=False)
