@@ -152,7 +152,7 @@ def _run_kdx(
         env["KDX_NO_BANNER"] = "1"
         if settings.keiro_api_key:
             env["KDX_KEIRO_API_KEY"] = settings.keiro_api_key
-        env["PYTHONPATH"] = package_src if not env.get("PYTHONPATH") else f"{package_src}:{env['PYTHONPATH']}"
+        env["PYTHONPATH"] = package_src if not env.get("PYTHONPATH") else f"{package_src}{os.pathsep}{env['PYTHONPATH']}"
         stdout = _run_codex_exec(settings, prompt, env=env, model=model, timeout_seconds=timeout_seconds)
     return parse_turn_usage(stdout)
 

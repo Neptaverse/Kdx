@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=69,<81", "wheel>=0.43"]
+requires = ["setuptools>=77,<81", "wheel>=0.43,<0.46"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -8,10 +8,33 @@ version = "0.1.0"
 description = "Token-efficient Codex wrapper with repo indexing and Keiro web search"
 readme = "README.md"
 requires-python = ">=3.11.0,<4"
-authors = [{ name = "KDX" }]
-dependencies = [
-  "mcp>=1.12.0",
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Neptaverse" }]
+keywords = ["codex", "cli", "developer-tools", "mcp", "search", "keiro"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Operating System :: MacOS",
+  "Operating System :: Microsoft :: Windows",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Software Development :: Build Tools",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Utilities",
 ]
+dependencies = [
+  "mcp>=1.12.0,<2",
+]
+
+[project.urls]
+Homepage = "https://github.com/Neptaverse/Kdx"
+Repository = "https://github.com/Neptaverse/Kdx.git"
+Issues = "https://github.com/Neptaverse/Kdx/issues"
+Releases = "https://github.com/Neptaverse/Kdx/releases"
 
 [project.scripts]
 kdx = "kdx.cli:main"

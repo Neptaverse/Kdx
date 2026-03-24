@@ -24,17 +24,18 @@ Repository: `https://github.com/Neptaverse/Kdx.git`
 git clone https://github.com/Neptaverse/Kdx.git
 cd Kdx
 
-python bootstrap.py
+python bootstrap.py --setup-only
+kdx
 ```
 
-On the first run, KDX will initialize its local workspace data automatically.
-
-This keeps the setup flow inside Python and avoids shell-specific `.venv/bin/...` or `.venv\\Scripts\\...` paths.
+The bootstrap step creates the local `.venv`, installs KDX, and installs a user-level `kdx` launcher. After that first setup step, use `kdx` directly from any directory.
 
 If `python` is not the right launcher on your machine, use the platform equivalent:
 
-- Windows: `py -3 bootstrap.py`
-- macOS/Linux with a `python3`-only install: `python3 bootstrap.py`
+- Windows: `py -3 bootstrap.py --setup-only`
+- macOS/Linux with a `python3`-only install: `python3 bootstrap.py --setup-only`
+
+If `kdx` still says `command not found` after setup, the bootstrap step will have printed the exact directory you need to add to `PATH`. Open a new terminal after updating `PATH`.
 
 If you are inside Conda and the install still misbehaves, run `conda deactivate` first, then run the same setup commands again.
 
@@ -57,13 +58,13 @@ The bootstrap flow already uses a longer pip timeout and retry budget by default
 ## Common Commands
 
 ```bash
-python bootstrap.py
-python bootstrap.py "fix the auth retry path and check the latest SDK docs"
-python bootstrap.py scan
-python bootstrap.py plan "where is the Keiro client implemented?"
-python bootstrap.py search "latest FastMCP docs"
-python bootstrap.py tokens "where is the Keiro client implemented? reply with the path only."
-python bootstrap.py update
+kdx
+kdx "fix the auth retry path and check the latest SDK docs"
+kdx scan
+kdx plan "where is the Keiro client implemented?"
+kdx search "latest FastMCP docs"
+kdx tokens "where is the Keiro client implemented? reply with the path only."
+kdx update
 ```
 
 ## What’s Different
@@ -75,7 +76,7 @@ Compared with plain Codex CLI, KDX adds a few opinionated pieces:
 - explicit local/external/hybrid routing instead of one generic prompt shape
 - token benchmarking against vanilla Codex on the same prompts
 - GitHub-backed update checks for the KDX wrapper itself
-- a Python-first bootstrap flow that works the same way on macOS, Windows, and Linux
+- a cross-platform bootstrap that installs a real user-level `kdx` command
 
 ## How It Works
 
@@ -121,7 +122,7 @@ KDX can read the Keiro API key from either:
 The easiest setup is:
 
 ```bash
-python bootstrap.py /keiro keiro_your_api_key_here
+kdx /keiro keiro_your_api_key_here
 ```
 
 The persisted config is stored outside the repo and is written with private file permissions.
@@ -131,9 +132,9 @@ The persisted config is stored outside the repo and is written with private file
 KDX can check GitHub for newer versions of the project and update the current clone:
 
 ```bash
-python bootstrap.py update
-python bootstrap.py update --check
-python bootstrap.py update --check-now
+kdx update
+kdx update --check
+kdx update --check-now
 ```
 
 `kdx update` applies the update by default.
@@ -149,7 +150,7 @@ The check is intentionally lightweight:
 Rollback stays explicit:
 
 ```bash
-python bootstrap.py update --rollback v0.1.0
+kdx update --rollback v0.1.0
 ```
 
 ## Local State
@@ -166,8 +167,8 @@ The repo-local `.kdx/` directory is intentionally ignored and should not be comm
 KDX includes a direct benchmark against vanilla Codex:
 
 ```bash
-python bootstrap.py tokens "where is the Keiro client implemented? reply with the path only."
-python bootstrap.py tokens --prompts-file bench/prompts_kdx_repo.txt --json
+kdx tokens "where is the Keiro client implemented? reply with the path only."
+kdx tokens --prompts-file bench/prompts_kdx_repo.txt --json
 ```
 
 This uses real `codex exec --json` runs and reads `turn.completed.usage`, so the numbers come from actual model usage rather than local estimates.
@@ -178,6 +179,8 @@ This uses real `codex exec --json` runs and reads `turn.completed.usage`, so the
 python bootstrap.py --setup-only
 python bootstrap.py --python -m unittest discover -s tests -v
 python bootstrap.py --python -m compileall src/kdx
+python bootstrap.py --python -m pip install build
+python bootstrap.py --python -m build
 ```
 
 ## Project Layout
@@ -211,10 +214,12 @@ What is still deliberately simple:
 - verification loops are not fully built out yet
 - retrieval tuning is still benchmark-driven and evolving
 
-## Notes Before Open Source
+## Release Readiness
 
-- Add a license before publishing
-- Keep `.kdx/`, `.bench/`, and `.venv/` out of the repo
-- Treat the token benchmark as a real measurement tool, not a marketing number
+- MIT licensed
+- Cross-platform CI on Linux, macOS, and Windows
+- Reproducible bootstrap flow for the global `kdx` launcher
+- Package build validated through `python -m build`
+- Repo-local runtime state stays out of source control
 
-If KDX says it is cheaper or better, it should be able to prove it on prompts you actually care about
+KDX still needs real-world benchmark tuning and broader parser coverage, but the repo is now structured for public releases and repeatable validation.

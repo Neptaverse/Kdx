@@ -76,7 +76,7 @@ def _ensure_mcp_runtime() -> None:
         return
     raise RuntimeError(
         "Missing runtime dependency `mcp`. Bootstrap KDX first with "
-        "`python bootstrap.py --setup-only`."
+        "`python bootstrap.py --setup-only`; that installs the global `kdx` command too."
     )
 
 
@@ -231,7 +231,7 @@ def run_codex(query: str, *, exec_mode: bool = False, use_web: bool | None = Non
         if settings.keiro_api_key:
             env["KDX_KEIRO_API_KEY"] = settings.keiro_api_key
         package_src = str(Path(__file__).resolve().parents[1])
-        env["PYTHONPATH"] = package_src if not env.get("PYTHONPATH") else f"{package_src}:{env['PYTHONPATH']}"
+        env["PYTHONPATH"] = package_src if not env.get("PYTHONPATH") else f"{package_src}{os.pathsep}{env['PYTHONPATH']}"
         command = [settings.codex_binary]
         if exec_mode:
             command.append("exec")
