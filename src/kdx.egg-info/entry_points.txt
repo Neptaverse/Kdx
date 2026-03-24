@@ -1,0 +1,2 @@
+[console_scripts]
+kdx = kdx.cli:main

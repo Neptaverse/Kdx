@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=69", "wheel"]
+requires = ["setuptools>=69,<81", "wheel>=0.43"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -7,7 +7,7 @@ name = "kdx"
 version = "0.1.0"
 description = "Token-efficient Codex wrapper with repo indexing and Keiro web search"
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.11.0,<4"
 authors = [{ name = "KDX" }]
 dependencies = [
   "mcp>=1.12.0",
