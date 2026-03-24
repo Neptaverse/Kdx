@@ -6,6 +6,8 @@ The goal is simple: keep Codex focused on the right parts of the repo, give it a
 
 KDX is not a fork of Codex. It launches the real `codex` binary, builds a temporary `CODEX_HOME`, attaches KDX-native MCP servers, and keeps just enough local state to make repo lookups and web-backed answers faster and more reliable.
 
+Repository: `https://github.com/Neptaverse/Kdx.git`
+
 ## What It Does
 
 - Builds an incremental repo index in `.kdx/index.json`
@@ -18,28 +20,28 @@ KDX is not a fork of Codex. It launches the real `codex` binary, builds a tempor
 ## Quick Start
 
 ```bash
-git clone <your-repo-url> kdx
-cd kdx
+git clone https://github.com/Neptaverse/Kdx.git
+cd Kdx
 
-python3 -m venv .venv
-. .venv/bin/activate
-pip install -e .
+./bin/setup-venv.sh
 
-kdx /keiro keiro_your_api_key_here
-kdx
+.venv/bin/kdx /keiro keiro_your_api_key_here
+.venv/bin/kdx
 ```
 
 On the first run, KDX will initialize its local workspace data automatically.
 
+This avoids Conda or shell aliases hijacking `pip` or `python`.
+
 ## Common Commands
 
 ```bash
-kdx
-kdx "fix the auth retry path and check the latest SDK docs"
-kdx scan
-kdx plan "where is the Keiro client implemented?"
-kdx search "latest FastMCP docs"
-kdx tokens "where is the Keiro client implemented? reply with the path only."
+.venv/bin/kdx
+.venv/bin/kdx "fix the auth retry path and check the latest SDK docs"
+.venv/bin/kdx scan
+.venv/bin/kdx plan "where is the Keiro client implemented?"
+.venv/bin/kdx search "latest FastMCP docs"
+.venv/bin/kdx tokens "where is the Keiro client implemented? reply with the path only."
 ```
 
 ## How It Works
@@ -84,7 +86,7 @@ KDX can read the Keiro API key from either:
 The easiest setup is:
 
 ```bash
-kdx /keiro keiro_your_api_key_here
+.venv/bin/kdx /keiro keiro_your_api_key_here
 ```
 
 The persisted config is stored outside the repo and is written with private file permissions.
@@ -103,8 +105,8 @@ The repo-local `.kdx/` directory is intentionally ignored and should not be comm
 KDX includes a direct benchmark against vanilla Codex:
 
 ```bash
-kdx tokens "where is the Keiro client implemented? reply with the path only."
-kdx tokens --prompts-file bench/prompts_kdx_repo.txt --json
+.venv/bin/kdx tokens "where is the Keiro client implemented? reply with the path only."
+.venv/bin/kdx tokens --prompts-file bench/prompts_kdx_repo.txt --json
 ```
 
 This uses real `codex exec --json` runs and reads `turn.completed.usage`, so the numbers come from actual model usage rather than local estimates.
@@ -112,9 +114,8 @@ This uses real `codex exec --json` runs and reads `turn.completed.usage`, so the
 ## Development
 
 ```bash
-. .venv/bin/activate
-python -m unittest discover -s tests -v
-python -m compileall src/kdx
+.venv/bin/python -m unittest discover -s tests -v
+.venv/bin/python -m compileall src/kdx
 ```
 
 ## Project Layout
