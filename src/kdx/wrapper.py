@@ -64,7 +64,7 @@ KDX_SESSION_INSTRUCTIONS = "\n".join(
     ]
 )
 KDX_CODEX_CONFIG_OVERRIDES = (
-    "web_search=false",
+    'web_search="disabled"',
     'disabled_tools=["web_search"]',
     "features.web_search_request=false",
     "features.web_search_cached=false",

@@ -55,10 +55,10 @@ class TokenCompareTests(unittest.TestCase):
                 settings,
                 "hello",
                 model="gpt-5.4",
-                config_overrides=("web_search=false",),
+                config_overrides=('web_search="disabled"',),
             )
             self.assertIn("-c", command)
-            self.assertIn("web_search=false", command)
+            self.assertIn('web_search="disabled"', command)
             self.assertEqual(command[-1], "hello")
 
 
