@@ -10,6 +10,12 @@ class SymbolRecord:
     kind: str
     line_start: int
     line_end: int
+    signature: str = ""
+    decorators: list[str] = field(default_factory=list)
+    bases: list[str] = field(default_factory=list)
+    docstring: str = ""
+    visibility: str = "public"
+    parent: str = ""
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "SymbolRecord":
@@ -18,6 +24,12 @@ class SymbolRecord:
             kind=str(data.get("kind", "symbol")),
             line_start=int(data.get("line_start", 1)),
             line_end=int(data.get("line_end", 1)),
+            signature=str(data.get("signature", "")),
+            decorators=[str(d) for d in data.get("decorators", [])],
+            bases=[str(b) for b in data.get("bases", [])],
+            docstring=str(data.get("docstring", "")),
+            visibility=str(data.get("visibility", "public")),
+            parent=str(data.get("parent", "")),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -37,6 +49,8 @@ class FileRecord:
     imports: list[str] = field(default_factory=list)
     keywords: list[str] = field(default_factory=list)
     symbols: list[SymbolRecord] = field(default_factory=list)
+    imported_by: list[str] = field(default_factory=list)
+    import_score: float = 0.0
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "FileRecord":
@@ -52,6 +66,8 @@ class FileRecord:
             imports=[str(item) for item in data.get("imports", [])],
             keywords=[str(item) for item in data.get("keywords", [])],
             symbols=[SymbolRecord.from_dict(item) for item in data.get("symbols", [])],
+            imported_by=[str(item) for item in data.get("imported_by", [])],
+            import_score=float(data.get("import_score", 0.0)),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -70,7 +86,7 @@ class ProjectIndex:
 
     @classmethod
     def empty(cls, root: str) -> "ProjectIndex":
-        return cls(version=4, root=root, generated_at="", file_count=0, files=[])
+        return cls(version=5, root=root, generated_at="", file_count=0, files=[])
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "ProjectIndex":

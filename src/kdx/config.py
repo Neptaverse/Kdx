@@ -28,7 +28,7 @@ class KdxSettings:
 
     @property
     def workspace_id(self) -> str:
-        digest = hashlib.sha1(str(self.repo_root).encode("utf-8")).hexdigest()[:12]
+        digest = hashlib.sha256(str(self.repo_root).encode("utf-8")).hexdigest()[:12]
         return f"kdx-{digest}"
 
 
@@ -108,8 +108,8 @@ def load_settings(repo_root: Path | None = None) -> KdxSettings:
         model=os.environ.get("KDX_MODEL", "gpt-5.4"),
         auto_init=os.environ.get("KDX_AUTO_INIT", "1").strip().lower() not in {"0", "false", "no", "off"},
         budget=BudgetConfig(
-            max_total_chars=int(os.environ.get("KDX_MAX_TOTAL_CHARS", "12000")),
-            max_file_chars=int(os.environ.get("KDX_MAX_FILE_CHARS", "2200")),
+            max_total_tokens=int(os.environ.get("KDX_MAX_TOTAL_TOKENS", "3000")),
+            max_file_tokens=int(os.environ.get("KDX_MAX_FILE_TOKENS", "550")),
             max_files=int(os.environ.get("KDX_MAX_FILES", "6")),
             max_snippets=int(os.environ.get("KDX_MAX_SNIPPETS", "10")),
             max_search_results=int(os.environ.get("KDX_MAX_SEARCH_RESULTS", "5")),

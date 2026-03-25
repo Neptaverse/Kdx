@@ -66,10 +66,10 @@ class IndexerAndRetrievalTests(unittest.TestCase):
     def test_read_only_question_gets_compact_budget_and_answer_only_profile(self) -> None:
         query = "Where does KDX decide whether a query is local, external, or hybrid? Keep the answer brief. Do not edit files."
         profile = build_query_profile(query)
-        tuned = budget_for_query(BudgetConfig(max_total_chars=12000, max_file_chars=2200, max_files=6, max_snippets=10), query)
+        tuned = budget_for_query(BudgetConfig(max_total_tokens=3000, max_file_tokens=550, max_files=6, max_snippets=10), query)
         self.assertTrue(profile.answer_only)
         self.assertTrue(profile.navigation_question)
-        self.assertLessEqual(tuned.max_total_chars, 3000)
+        self.assertLessEqual(tuned.max_total_tokens, 750)
         self.assertLessEqual(tuned.max_files, 2)
 
     def test_retrieve_context_prefers_matching_symbol(self) -> None:
@@ -84,7 +84,7 @@ class IndexerAndRetrievalTests(unittest.TestCase):
             index_path = root / ".kdx" / "index.json"
             index_path.parent.mkdir(parents=True, exist_ok=True)
             index = scan_project(root, index_path)
-            snippets = retrieve_context(root, index, "refresh token auth manager", BudgetConfig(max_total_chars=4000, max_file_chars=800, max_files=3))
+            snippets = retrieve_context(root, index, "refresh token auth manager", BudgetConfig(max_total_tokens=1000, max_file_tokens=200, max_files=3))
             self.assertTrue(snippets)
             self.assertEqual(snippets[0].path, "src/auth.py")
             self.assertEqual(snippets[0].symbol, "refresh_token")
@@ -119,7 +119,7 @@ class IndexerAndRetrievalTests(unittest.TestCase):
             payload["version"] = 2
             index_path.write_text(json.dumps(payload), encoding="utf-8")
             refreshed = ensure_project_index(root, index_path)
-            self.assertEqual(refreshed.version, 4)
+            self.assertEqual(refreshed.version, 5)
             self.assertEqual(refreshed.files[0].role, "bench")
 
     def test_retrieve_context_prefers_source_over_docs_for_code_question(self) -> None:

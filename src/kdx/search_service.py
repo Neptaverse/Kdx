@@ -654,7 +654,9 @@ def _parse_requirements(path: Path) -> list[DependencyHint]:
         if not stripped or stripped.startswith("-"):
             continue
         name, _, version = stripped.partition("==")
-        normalized_name = name.split(">=", 1)[0].split("<=", 1)[0].split("~=", 1)[0].strip()
+        normalized_name = name.split("[", 1)[0].split(">=", 1)[0].split("<=", 1)[0].split("~=", 1)[0].split("!=", 1)[0].split("<", 1)[0].split(">", 1)[0].strip()
+        if not normalized_name:
+            continue
         output.append(DependencyHint(name=normalized_name, version=normalize_version(version or stripped), ecosystem="python", source_file=path.name))
     return output
 

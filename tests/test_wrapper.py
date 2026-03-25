@@ -53,11 +53,9 @@ class WrapperTests(unittest.TestCase):
             self.assertEqual(plan["prompt"], "")
             self.assertEqual(plan["summary"]["budget"]["input_tokens_estimate"], 0)
 
-    def test_auto_update_only_on_interactive_startup(self) -> None:
-        self.assertTrue(should_auto_update_on_startup("", exec_mode=False, environ={}))
-        self.assertFalse(should_auto_update_on_startup("fix bug", exec_mode=False, environ={}))
-        self.assertFalse(should_auto_update_on_startup("", exec_mode=True, environ={}))
-        self.assertFalse(should_auto_update_on_startup("", exec_mode=False, environ={"KDX_NO_AUTO_UPDATE": "1"}))
+    def test_auto_update_runs_on_all_invocations(self) -> None:
+        self.assertTrue(should_auto_update_on_startup(environ={}))
+        self.assertFalse(should_auto_update_on_startup(environ={"KDX_NO_AUTO_UPDATE": "1"}))
 
     def test_kdx_appends_codex_overrides_to_disable_native_web_search(self) -> None:
         command = ["codex", "exec"]

@@ -7,9 +7,9 @@ from kdx.budget import BudgetConfig, BudgetGovernor, estimate_tokens
 
 class BudgetGovernorTests(unittest.TestCase):
     def test_allow_respects_total_and_snippet_caps(self) -> None:
-        governor = BudgetGovernor(BudgetConfig(max_total_chars=100, max_file_chars=60, max_snippets=2))
-        self.assertEqual(governor.allow(80), 60)
-        self.assertEqual(governor.allow(80), 40)
+        governor = BudgetGovernor(BudgetConfig(max_total_tokens=25, max_file_tokens=15, max_snippets=2))
+        self.assertEqual(governor.allow(20), 15)
+        self.assertEqual(governor.allow(20), 10)
         self.assertEqual(governor.allow(10), 0)
 
     def test_estimate_tokens_is_non_zero_for_non_empty_text(self) -> None:

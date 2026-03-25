@@ -2,12 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, replace
 import json
+import os
 from datetime import datetime, timezone
 from pathlib import Path
 import re
 from typing import Iterable
 
-from kdx.budget import BudgetConfig, BudgetGovernor, estimate_tokens
+from kdx.budget import BudgetConfig, BudgetGovernor, estimate_tokens, tokens_to_chars, chars_to_tokens
 from kdx.indexer import tokenize
 from kdx.models import FileRecord, HistoryEntry, ProjectIndex, QueryRoute, RetrievedSnippet
 
@@ -102,24 +103,24 @@ def budget_for_query(budget: BudgetConfig, query: str) -> BudgetConfig:
     if profile.answer_only:
         tuned = replace(
             tuned,
-            max_total_chars=min(tuned.max_total_chars, 4_200),
-            max_file_chars=min(tuned.max_file_chars, 1_400),
+            max_total_tokens=min(tuned.max_total_tokens, 1_050),
+            max_file_tokens=min(tuned.max_file_tokens, 350),
             max_files=min(tuned.max_files, 3),
             max_snippets=min(tuned.max_snippets, 3),
         )
     if profile.navigation_question:
         tuned = replace(
             tuned,
-            max_total_chars=min(tuned.max_total_chars, 3_000),
-            max_file_chars=min(tuned.max_file_chars, 1_200),
+            max_total_tokens=min(tuned.max_total_tokens, 750),
+            max_file_tokens=min(tuned.max_file_tokens, 300),
             max_files=min(tuned.max_files, 2),
             max_snippets=min(tuned.max_snippets, 2),
         )
     if profile.path_hints:
         tuned = replace(
             tuned,
-            max_total_chars=min(tuned.max_total_chars, 2_600),
-            max_file_chars=min(tuned.max_file_chars, 1_600),
+            max_total_tokens=min(tuned.max_total_tokens, 650),
+            max_file_tokens=min(tuned.max_file_tokens, 400),
             max_files=min(tuned.max_files, max(1, len(profile.path_hints))),
             max_snippets=min(tuned.max_snippets, max(1, len(profile.path_hints))),
         )
@@ -166,17 +167,26 @@ def _path_hint_score(path_hints: set[str], record: FileRecord) -> float:
 
 
 def _role_score(profile: QueryProfile, record: FileRecord) -> float:
-    if record.role == "source":
+    role = record.role
+    if role == "source":
         return 7.0
-    if record.role == "test":
+    if role == "entry":
+        return 5.0
+    if role == "handler":
+        return 6.0 if profile.implementation_task else 4.0
+    if role == "middleware":
+        return 5.0 if profile.implementation_task else 3.0
+    if role == "model":
+        return 6.0
+    if role == "test":
         return 7.0 if profile.wants_tests or profile.implementation_task else -14.0
-    if record.role == "bench":
+    if role == "bench":
         return 6.0 if profile.wants_bench else -15.0
-    if record.role == "docs":
+    if role == "docs":
         return 8.0 if profile.wants_docs else -12.0
-    if record.role == "config":
+    if role == "config":
         return 8.0 if profile.wants_config else -10.0
-    if record.role == "script":
+    if role == "script":
         return 4.0 if profile.implementation_task else -4.0
     return 0.0
 
@@ -195,6 +205,19 @@ def _file_score(profile: QueryProfile, record: FileRecord) -> float:
     score += 2.0 * len(query_terms & keywords)
     score += 6.0 * len(profile.identifier_hints & symbol_terms)
     score += _role_score(profile, record)
+    # Dependency centrality: structurally important files score higher
+    score += min(record.import_score * 1.5, 12.0)
+    # Decorator/docstring/signature term matching across all symbols
+    for sym in record.symbols[:20]:
+        if sym.decorators:
+            dec_terms = set(tokenize(" ".join(sym.decorators)))
+            score += 3.0 * len(query_terms & dec_terms)
+        if sym.docstring:
+            doc_terms = set(tokenize(sym.docstring))
+            score += 1.5 * len(query_terms & doc_terms)
+        if sym.signature:
+            sig_terms = set(tokenize(sym.signature))
+            score += 1.0 * len(query_terms & sig_terms)
     if record.path.startswith("src/"):
         score += 3.0
     if record.path.startswith("tests/") and not profile.wants_tests:
@@ -243,10 +266,25 @@ def _symbol_score(query_terms: set[str], record: FileRecord) -> list[tuple[float
             continue
         overlap = query_terms & symbol_terms
         score = 5.0 * len(overlap)
+        # Docstring matching
+        if symbol.docstring:
+            doc_overlap = query_terms & set(tokenize(symbol.docstring))
+            score += 2.0 * len(doc_overlap)
+        # Signature matching
+        if symbol.signature:
+            sig_overlap = query_terms & set(tokenize(symbol.signature))
+            score += 1.5 * len(sig_overlap)
+        # Decorator matching (route, handler, middleware, etc.)
+        if symbol.decorators:
+            dec_overlap = query_terms & set(tokenize(" ".join(symbol.decorators)))
+            score += 3.0 * len(dec_overlap)
+        # Visibility penalties
+        if symbol.visibility == "private":
+            score *= 0.5
+        elif symbol.visibility == "internal":
+            score *= 0.75
         if symbol.name == "main":
             score -= 2.0
-        if symbol.name.startswith("_"):
-            score -= 1.5
         if score > 0:
             ranked.append((score, symbol.name))
     ranked.sort(reverse=True)
@@ -254,7 +292,10 @@ def _symbol_score(query_terms: set[str], record: FileRecord) -> list[tuple[float
 
 
 def _extract_symbol_content(root: Path, record: FileRecord, symbol_name: str, max_chars: int) -> tuple[str, int, int]:
-    text = (root / record.path).read_text(encoding="utf-8", errors="ignore")
+    try:
+        text = (root / record.path).read_text(encoding="utf-8", errors="ignore")
+    except (OSError, FileNotFoundError):
+        return "", 1, 1
     for symbol in record.symbols:
         if symbol.name != symbol_name:
             continue
@@ -302,15 +343,16 @@ def retrieve_context(root: Path, index: ProjectIndex, query: str, budget: Budget
             continue
         if _should_skip_file(profile, record, snippets, seen_directories):
             continue
-        granted = governor.allow(budget.max_file_chars)
-        if granted <= 0:
+        granted_tokens = governor.allow(budget.max_file_tokens)
+        if granted_tokens <= 0:
             break
+        granted_chars = tokens_to_chars(granted_tokens)
         reason = []
         symbols = _symbol_score(query_terms, record)
         if symbols and symbols[0][0] >= 8.5:
             symbol_name = symbols[0][1]
-            content, line_start, line_end = _extract_symbol_content(root, record, symbol_name, granted)
-            reason.append(f"symbol match: {symbol_name}")
+            content, line_start, line_end = _extract_symbol_content(root, record, symbol_name, granted_chars)
+            reason.append(f"symbol: {symbol_name}")
             snippets.append(
                 RetrievedSnippet(
                     path=record.path,
@@ -324,18 +366,21 @@ def retrieve_context(root: Path, index: ProjectIndex, query: str, budget: Budget
             )
             seen_directories.add(Path(record.path).parent.as_posix())
             continue
-        text = (root / record.path).read_text(encoding="utf-8", errors="ignore")
-        content, line_start, line_end = _excerpt_by_terms(text, query_terms, granted)
+        try:
+            text = (root / record.path).read_text(encoding="utf-8", errors="ignore")
+        except (OSError, FileNotFoundError):
+            continue
+        content, line_start, line_end = _excerpt_by_terms(text, query_terms, granted_chars)
         overlap = sorted(query_terms & set(record.keywords))
         if overlap:
-            reason.append(f"keyword overlap: {', '.join(overlap[:4])}")
+            reason.append(f"kw: {', '.join(overlap[:3])}")
         path_overlap = [hint for hint in sorted(profile.path_hints) if hint in record.path.lower()]
         if path_overlap:
-            reason.append(f"path hint: {path_overlap[0]}")
+            reason.append(f"path: {path_overlap[0]}")
         if not reason and score > 0:
-            reason.append("path/summary overlap")
+            reason.append("relevance")
         if not reason:
-            reason.append("recent fallback")
+            reason.append("fallback")
         snippets.append(
             RetrievedSnippet(
                 path=record.path,
@@ -353,28 +398,36 @@ def retrieve_context(root: Path, index: ProjectIndex, query: str, budget: Budget
 def render_context(snippets: Iterable[RetrievedSnippet], budget: BudgetConfig) -> str:
     parts = []
     for snippet in snippets:
-        label = f"{snippet.path}:{snippet.line_start}"
-        if snippet.symbol:
-            label += f"::{snippet.symbol}"
-        parts.append(
-            "\n".join(
-                [
-                    f"FILE {label}",
-                    f"REASON {snippet.reason}",
-                    snippet.content.strip(),
-                ]
-            )
-        )
+        sym = f"::{snippet.symbol}" if snippet.symbol else ""
+        header = f"── {snippet.path}:{snippet.line_start}{sym} [{snippet.reason}]"
+        parts.append(f"{header}\n{snippet.content.strip()}")
     blob = "\n\n".join(parts)
-    if len(blob) > budget.max_total_chars:
-        blob = blob[: budget.max_total_chars]
+    max_chars = budget.max_total_chars
+    if len(blob) > max_chars:
+        blob = blob[:max_chars]
     return blob
+
+
+_HISTORY_MAX_LINES = 500
+_HISTORY_KEEP_LINES = 200
 
 
 def append_history(history_path: Path, entry: HistoryEntry) -> None:
     history_path.parent.mkdir(parents=True, exist_ok=True)
     with history_path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(entry.to_dict(), sort_keys=True) + "\n")
+    _rotate_history(history_path)
+
+
+def _rotate_history(history_path: Path) -> None:
+    try:
+        lines = history_path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return
+    if len(lines) <= _HISTORY_MAX_LINES:
+        return
+    trimmed = lines[-_HISTORY_KEEP_LINES:]
+    history_path.write_text("\n".join(trimmed) + "\n", encoding="utf-8")
 
 
 def search_history(history_path: Path, query: str, limit: int = 5) -> list[HistoryEntry]:
@@ -385,7 +438,10 @@ def search_history(history_path: Path, query: str, limit: int = 5) -> list[Histo
     for line in history_path.read_text(encoding="utf-8").splitlines():
         if not line.strip():
             continue
-        entry = HistoryEntry.from_dict(json.loads(line))
+        try:
+            entry = HistoryEntry.from_dict(json.loads(line))
+        except (json.JSONDecodeError, KeyError):
+            continue
         hay = set(tokenize(entry.query))
         score = len(query_terms & hay)
         if score > 0:
@@ -395,21 +451,23 @@ def search_history(history_path: Path, query: str, limit: int = 5) -> list[Histo
 
 
 def impact_analysis(index: ProjectIndex, changed_files: list[str], limit: int = 10) -> list[dict[str, object]]:
-    changed_tokens = set()
-    for file in changed_files:
-        changed_tokens.update(tokenize(Path(file).stem))
+    changed_set = set(changed_files)
     impacts: list[dict[str, object]] = []
     for record in index.files:
-        imports = set(tokenize(" ".join(record.imports)))
-        overlap = sorted(changed_tokens & imports)
-        if overlap:
+        if record.path in changed_set:
+            continue
+        # Use real dependency graph: which changed files does this record import?
+        direct_hits = [f for f in record.imported_by if f in changed_set]
+        import_hits = [f for f in record.imports if any(f.endswith(c.rsplit('.', 1)[0]) or c.rsplit('/', 1)[-1].rsplit('.', 1)[0] in f for c in changed_set)]
+        all_reasons = sorted(set(direct_hits + import_hits))[:5]
+        if all_reasons:
             impacts.append({
                 "path": record.path,
-                "reasons": overlap[:5],
-                "score": len(overlap) + (2 if record.is_test else 0),
+                "reasons": all_reasons,
+                "score": len(direct_hits) * 3 + len(import_hits) + (2 if record.is_test else 0),
                 "is_test": record.is_test,
             })
-    impacts.sort(key=lambda item: (int(item["score"]), bool(item["is_test"])), reverse=True)
+    impacts.sort(key=lambda item: (item["score"], item["is_test"]), reverse=True)
     return impacts[:limit]
 
 
@@ -429,9 +487,70 @@ def plan_summary(route: QueryRoute, snippets: list[RetrievedSnippet], search_res
         "snippets": [snippet.to_dict() for snippet in snippets],
         "search_results": search_results[: budget.max_search_results],
         "budget": {
-            "max_total_chars": budget.max_total_chars,
-            "max_file_chars": budget.max_file_chars,
+            "max_total_tokens": budget.max_total_tokens,
+            "max_file_tokens": budget.max_file_tokens,
             "max_files": budget.max_files,
             "input_tokens_estimate": estimate_tokens(render_context(snippets, budget)),
         },
     }
+
+
+# ── Workspace Tree ──────────────────────────────────────────────────────────
+
+_NOISY_DIRS = {
+    ".git", ".svn", ".hg", "node_modules", "__pycache__", ".pytest_cache",
+    ".ruff_cache", ".mypy_cache", ".next", ".nuxt", "dist", "build", "out",
+    "target", ".venv", "venv", "env", ".tox", ".eggs", "vendor", ".cache",
+    ".turbo", "coverage", ".nyc_output", ".parcel-cache",
+}
+_TREE_MAX_DEPTH = 2
+_TREE_ENTRIES_PER_LEVEL = 15
+
+
+def build_workspace_tree(root: Path, max_depth: int = _TREE_MAX_DEPTH) -> str:
+    lines: list[str] = []
+    _collect_tree(root, root, 0, max_depth, lines)
+    return "\n".join(lines) if lines else "(empty)"
+
+
+def _collect_tree(base: Path, current: Path, depth: int, max_depth: int, lines: list[str]) -> None:
+    if depth >= max_depth:
+        return
+    try:
+        entries = sorted(current.iterdir(), key=lambda p: (not p.is_dir(), p.name.lower()))
+    except OSError:
+        return
+    entries = [e for e in entries if e.name not in _NOISY_DIRS and not e.name.startswith(".")]
+    shown = 0
+    for entry in entries:
+        if shown >= _TREE_ENTRIES_PER_LEVEL:
+            remaining = len(entries) - shown
+            if remaining > 0:
+                lines.append(f"{'  ' * depth}… +{remaining} more")
+            break
+        rel = entry.relative_to(base).as_posix()
+        if entry.is_dir():
+            lines.append(f"{'  ' * depth}{rel}/")
+            _collect_tree(base, entry, depth + 1, max_depth, lines)
+        else:
+            lines.append(f"{'  ' * depth}{rel}")
+        shown += 1
+
+
+def build_key_files_header(index: ProjectIndex, limit: int = 8) -> str:
+    if not index.files:
+        return ""
+    ranked = sorted(index.files, key=lambda f: f.import_score, reverse=True)
+    lines: list[str] = []
+    for record in ranked[:limit]:
+        sym_count = len(record.symbols)
+        imp_count = len(record.imported_by)
+        parts = [record.role]
+        if sym_count:
+            parts.append(f"{sym_count} syms")
+        if imp_count:
+            parts.append(f"imported_by:{imp_count}")
+        if record.import_score > 0:
+            parts.append(f"centrality:{record.import_score}")
+        lines.append(f"  {record.path} [{', '.join(parts)}]")
+    return "\n".join(lines)

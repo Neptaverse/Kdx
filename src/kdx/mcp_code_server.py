@@ -83,7 +83,9 @@ def build_server() -> Any:
         if "::" in file:
             resolved_file, resolved_symbol = file.split("::", 1)
         target = (settings.repo_root / resolved_file).resolve()
-        if settings.repo_root not in target.parents and target != settings.repo_root:
+        try:
+            target.relative_to(settings.repo_root.resolve())
+        except ValueError:
             return {"ok": False, "error": "outside project root"}
         if not target.exists():
             return {"ok": False, "error": "file not found", "file": resolved_file}

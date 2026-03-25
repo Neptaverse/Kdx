@@ -39,17 +39,14 @@ def _strip_tables_by_prefix(config_text: str, prefix: str) -> str:
     skipping = False
     for line in config_text.splitlines():
         stripped = line.strip()
-        if stripped.startswith(prefix):
-            skipping = True
-            continue
-        if skipping:
-            if stripped.startswith("["):
-                if stripped.startswith(prefix):
-                    skipping = True
-                    continue
-                skipping = False
-            else:
+        if stripped.startswith("["):
+            if stripped.startswith(prefix):
+                skipping = True
                 continue
+            else:
+                skipping = False
+        if skipping:
+            continue
         output.append(line)
     return "\n".join(output).strip() + "\n"
 

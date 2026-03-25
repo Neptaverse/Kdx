@@ -299,9 +299,11 @@ def main(argv: list[str] | None = None) -> int:
     try:
         return int(args.func(args))
     except KeiroError as exc:
-        parser.exit(2, f"kdx: {exc}\n")
+        print(f"kdx: {exc}", file=sys.stderr)
+        return 2
     except RuntimeError as exc:
-        parser.exit(2, f"kdx: {exc}\n")
+        print(f"kdx: {exc}", file=sys.stderr)
+        return 2
 
 
 if __name__ == "__main__":

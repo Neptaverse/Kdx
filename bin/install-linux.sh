@@ -58,7 +58,7 @@ sync_repo() {
   git -C "$REPO_DIR" remote set-url origin "$REPO_URL" || true
   git -C "$REPO_DIR" fetch --depth=1 origin "$BRANCH" >/dev/null 2>&1 || git -C "$REPO_DIR" fetch origin
   git -C "$REPO_DIR" checkout "$BRANCH" >/dev/null 2>&1 || true
-  git -C "$REPO_DIR" pull --ff-only || true
+  git -C "$REPO_DIR" pull --ff-only || log "WARNING: git pull --ff-only failed; continuing with current checkout"
 }
 
 print_path_hint() {

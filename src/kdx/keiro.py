@@ -197,6 +197,7 @@ def cached_search(
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     now = datetime.now(timezone.utc)
     cache = _load_cache(cache_path)
+    cache = _evict_expired(cache, now)
     entry = cache.get(cache_key)
     if isinstance(entry, dict):
         expires_at = _parse_timestamp(str(entry.get("expires_at", "")))
@@ -220,6 +221,17 @@ def _load_cache(cache_path: Path) -> dict[str, Any]:
     except (OSError, json.JSONDecodeError):
         return {}
     return payload if isinstance(payload, dict) else {}
+
+
+def _evict_expired(cache: dict[str, Any], now: datetime) -> dict[str, Any]:
+    live: dict[str, Any] = {}
+    for key, entry in cache.items():
+        if not isinstance(entry, dict):
+            continue
+        expires_at = _parse_timestamp(str(entry.get("expires_at", "")))
+        if expires_at is not None and expires_at > now:
+            live[key] = entry
+    return live
 
 
 def _parse_timestamp(value: str) -> datetime | None:

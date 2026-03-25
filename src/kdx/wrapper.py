@@ -16,7 +16,9 @@ from kdx.models import ProjectIndex
 from kdx.retrieval import (
     append_history,
     budget_for_query,
+    build_key_files_header,
     build_query_profile,
+    build_workspace_tree,
     classify_query,
     make_history_entry,
     plan_summary,
@@ -124,17 +126,13 @@ def should_preload_web(
         return False
     if profile.answer_only and has_local_context:
         return False
-    return False
+    return True
 
 
 def should_auto_update_on_startup(
-    query: str,
     *,
-    exec_mode: bool,
     environ: dict[str, str] | None = None,
 ) -> bool:
-    if exec_mode or query.strip():
-        return False
     return should_auto_apply_updates(environ)
 
 
@@ -147,6 +145,8 @@ def build_bootstrap_prompt(
     search_results: list[dict[str, Any]],
     *,
     answer_only: bool = False,
+    workspace_tree: str = "",
+    key_files: str = "",
 ) -> str:
     history_block = "\n".join(
         f"- {item['created_at']} | {item['route']} | {item['query']} | files={', '.join(item['files'][:4])}"
@@ -161,10 +161,12 @@ def build_bootstrap_prompt(
         "KDX TASK CONTEXT",
         f"ROUTE: {route_mode}",
         *(f"- {reason}" for reason in route_reasons),
-        "",
-        "LOCAL CONTEXT:",
-        local_context or "(none preloaded)",
     ]
+    if workspace_tree:
+        parts.extend(["", "WORKSPACE TREE:", workspace_tree])
+    if key_files:
+        parts.extend(["", "KEY FILES:", key_files])
+    parts.extend(["", "LOCAL CONTEXT:", local_context or "(none preloaded)"])
     if answer_only:
         parts.extend(
             [
@@ -213,6 +215,8 @@ def build_execution_plan(query: str, settings: KdxSettings | None = None, use_we
         else use_web
     )
     context_blob = render_context(snippets, budget)
+    tree = build_workspace_tree(settings.repo_root)
+    key_files = build_key_files_header(index, limit=8)
     history = [entry.to_dict() for entry in search_history(settings.history_path, query, limit=5)]
     search_results, search_queries = maybe_keiro_search(settings, query, enabled=web_enabled)
     prompt = build_bootstrap_prompt(
@@ -223,6 +227,8 @@ def build_execution_plan(query: str, settings: KdxSettings | None = None, use_we
         history,
         search_results,
         answer_only=profile.answer_only,
+        workspace_tree=tree,
+        key_files=key_files,
     )
     summary = plan_summary(route, snippets, search_results, budget)
     summary["budget"]["input_tokens_estimate"] = estimate_tokens(prompt)
@@ -247,7 +253,7 @@ def run_codex(query: str, *, exec_mode: bool = False, use_web: bool | None = Non
     if should_check_for_updates(env):
         status = check_for_updates(updater_settings, environ=env)
         should_auto_update = (
-            should_auto_update_on_startup(query, exec_mode=exec_mode, environ=env)
+            should_auto_update_on_startup(environ=env)
             and bool(status.get("update_available"))
         )
         if should_auto_update:
