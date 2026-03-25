@@ -54,6 +54,22 @@ def _strip_tables_by_prefix(config_text: str, prefix: str) -> str:
     return "\n".join(output).strip() + "\n"
 
 
+def _drop_web_search_assignments(config_text: str) -> str:
+    output: list[str] = []
+    for line in config_text.splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#"):
+            output.append(line)
+            continue
+        config_part = stripped.split("#", 1)[0].strip()
+        if "=" in config_part:
+            key = config_part.split("=", 1)[0].strip()
+            if key == "web_search":
+                continue
+        output.append(line)
+    return "\n".join(output).strip() + "\n"
+
+
 def _render_mcp_tables(settings: KdxSettings) -> str:
     python_bin = sys.executable
     return "\n".join(
@@ -98,6 +114,7 @@ def prepared_codex_home(
         base_config = _read_text(settings.base_codex_home / "config.toml")
         base_config = _strip_tables_by_prefix(base_config, "[mcp_servers.")
         base_config = _strip_table_by_header(base_config, f'[projects."{settings.repo_root}"]')
+        base_config = _drop_web_search_assignments(base_config)
         merged = (base_config.rstrip() + "\n\n" if base_config.strip() else "") + _render_mcp_tables(settings)
         (temp_home / "config.toml").write_text(merged, encoding="utf-8")
         instructions = _merge_session_instructions(settings.base_codex_home, session_instructions)
