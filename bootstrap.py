@@ -47,10 +47,16 @@ def _python_runtime_guard_error(version_info: Any | None = None) -> str:
     )
 
 
-def run(command: list[str], *, env: dict[str, str] | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
+def run(
+    command: list[str],
+    *,
+    env: dict[str, str] | None = None,
+    check: bool = True,
+    cwd: Path | None = ROOT,
+) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         command,
-        cwd=str(ROOT),
+        cwd=None if cwd is None else str(cwd),
         env=env,
         check=check,
         text=True,
@@ -147,7 +153,7 @@ def main(argv: list[str] | None = None) -> int:
     if kdx_args and kdx_args[0] == "--":
         kdx_args = kdx_args[1:]
     command = [str(python_bin), *kdx_args] if args.python else [str(python_bin), "-m", "kdx.cli", *kdx_args]
-    process = run(command, check=False)
+    process = run(command, check=False, cwd=Path.cwd())
     return int(process.returncode)
 
 

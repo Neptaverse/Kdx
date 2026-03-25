@@ -42,6 +42,7 @@ class BootstrapTests(unittest.TestCase):
         run_mock.assert_called_once()
         command = run_mock.call_args.kwargs.get('command') or run_mock.call_args.args[0]
         self.assertEqual(command, ['/tmp/venv-python', '-m', 'unittest', 'discover'])
+        self.assertEqual(run_mock.call_args.kwargs.get('cwd'), Path.cwd())
 
     def test_install_global_launcher_writes_wrapper(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
