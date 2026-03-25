@@ -56,9 +56,19 @@ _WARNING_COLOR = "\033[38;5;196m"
 _INFO_COLOR = "\033[38;5;250m"
 _RESET_COLOR = "\033[0m"
 _TRUTHY = {"1", "true", "yes", "on"}
-_COMPACT_BANNER = "KDX"
+_COMPACT_BANNER = "\n".join(
+    [
+        "+-----+",
+        "| KDX |",
+        "+-----+",
+    ]
+)
 _MIN_WIDTH = 24
+_MIN_HEIGHT = 6
 _FULL_BANNER_WIDTH = max(len(line) for line in KDX_ASCII_LOGO.splitlines())
+_FULL_BANNER_HEIGHT = len(KDX_ASCII_LOGO.splitlines())
+_COMPACT_BANNER_WIDTH = max(len(line) for line in _COMPACT_BANNER.splitlines())
+_COMPACT_BANNER_HEIGHT = len(_COMPACT_BANNER.splitlines())
 
 
 def _env_flag(name: str, environ: dict[str, str] | None = None) -> bool:
@@ -98,22 +108,58 @@ def _should_colorize(stream: TextIO, environ: dict[str, str] | None = None) -> b
     return hasattr(stream, "isatty") and stream.isatty()
 
 
-def _terminal_width(
+def _terminal_size(
     stream: TextIO,
     *,
     environ: dict[str, str] | None = None,
     terminal_width: int | None = None,
-) -> int:
-    if terminal_width is not None:
-        return max(_MIN_WIDTH, terminal_width)
+    terminal_height: int | None = None,
+) -> tuple[int, int]:
+    width = max(_MIN_WIDTH, terminal_width) if terminal_width is not None else 0
+    height = max(_MIN_HEIGHT, terminal_height) if terminal_height is not None else 0
+    if width and height:
+        return width, height
     env = os.environ if environ is None else environ
-    raw_columns = env.get("COLUMNS", "").strip()
+    raw_columns = env.get("COLUMNS", "").strip() if not width else ""
+    raw_lines = env.get("LINES", "").strip() if not height else ""
     if raw_columns.isdigit():
-        return max(_MIN_WIDTH, int(raw_columns))
+        width = max(_MIN_WIDTH, int(raw_columns))
+    if raw_lines.isdigit():
+        height = max(_MIN_HEIGHT, int(raw_lines))
+    if width and height:
+        return width, height
     try:
-        return max(_MIN_WIDTH, shutil.get_terminal_size(fallback=(120, 40)).columns)
+        size = shutil.get_terminal_size(fallback=(120, 40))
+        width = width or max(_MIN_WIDTH, size.columns)
+        height = height or max(_MIN_HEIGHT, size.lines)
+        return width, height
     except OSError:
-        return 120
+        return width or 120, height or 40
+
+
+def _banner_style(
+    *,
+    width: int,
+    height: int,
+    environ: dict[str, str] | None = None,
+) -> str:
+    env = os.environ if environ is None else environ
+    override = env.get("KDX_BANNER_STYLE", "auto").strip().lower()
+    if override in {"off", "none", "0"}:
+        return "off"
+    if override in {"compact", "small", "minimal"}:
+        return "compact"
+    if override == "full":
+        return "full"
+    if _env_flag("KDX_FORCE_BANNER", env):
+        if width >= _FULL_BANNER_WIDTH and height >= _FULL_BANNER_HEIGHT + 8:
+            return "full"
+        return "compact"
+    if width >= _FULL_BANNER_WIDTH and height >= _FULL_BANNER_HEIGHT + 8:
+        return "full"
+    if width >= _COMPACT_BANNER_WIDTH and height >= _COMPACT_BANNER_HEIGHT + 5:
+        return "compact"
+    return "off"
 
 
 def _wrap_text(text: str, width: int) -> list[str]:
@@ -134,8 +180,23 @@ def _wrap_text(text: str, width: int) -> list[str]:
     return wrapped
 
 
-def render_banner(*, color: bool = False, terminal_width: int | None = None) -> str:
-    banner = KDX_ASCII_LOGO if terminal_width is None or terminal_width >= _FULL_BANNER_WIDTH else _COMPACT_BANNER
+def render_banner(
+    *,
+    color: bool = False,
+    terminal_width: int | None = None,
+    terminal_height: int | None = None,
+    environ: dict[str, str] | None = None,
+) -> str:
+    width, height = _terminal_size(
+        sys.stderr,
+        environ=environ,
+        terminal_width=terminal_width,
+        terminal_height=terminal_height,
+    )
+    style = _banner_style(width=width, height=height, environ=environ)
+    if style == "off":
+        return ""
+    banner = KDX_ASCII_LOGO if style == "full" else _COMPACT_BANNER
     if not color:
         return banner
     return f"{_BANNER_COLOR}{banner}{_RESET_COLOR}"
@@ -158,8 +219,10 @@ def render_startup_status(
     keiro_configured: bool,
     color: bool,
     terminal_width: int | None = None,
+    terminal_height: int | None = None,
 ) -> str:
     width = max(_MIN_WIDTH, terminal_width or 120)
+    height = max(_MIN_HEIGHT, terminal_height or 40)
     lines: list[str] = []
     lines.extend(
         _paint_wrapped(
@@ -171,7 +234,7 @@ def render_startup_status(
     )
     lines.extend(
         _paint_wrapped(
-            f"Indexed files: {file_count if file_count is not None else 'unknown'} | auto-init: on",
+            f"Files: {file_count if file_count is not None else 'unknown'} | auto-init: on",
             _INFO_COLOR,
             enabled=color,
             width=width,
@@ -181,9 +244,23 @@ def render_startup_status(
         lines.extend(_paint_wrapped("KEIRO: ready", _SUCCESS_COLOR, enabled=color, width=width))
     else:
         lines.extend(_paint_wrapped("KEIRO: not configured", _WARNING_COLOR, enabled=color, width=width))
-        lines.extend(_paint_wrapped("Run: kdx /keiro <api-key>", _WARNING_COLOR, enabled=color, width=width))
-        lines.extend(_paint_wrapped("Get a key: https://www.keirolabs.cloud", _WARNING_COLOR, enabled=color, width=width))
+        if height >= 9:
+            lines.extend(_paint_wrapped("Run: kdx /keiro <api-key>", _WARNING_COLOR, enabled=color, width=width))
+        if width >= 44 and height >= 12:
+            lines.extend(_paint_wrapped("Get a key: https://www.keirolabs.cloud", _WARNING_COLOR, enabled=color, width=width))
     return "\n".join(lines)
+
+
+def _normalize_update_notice(update_notice: str, *, width: int, height: int) -> str:
+    compact = " ".join(update_notice.split())
+    if not compact:
+        return ""
+    if width < 70 or height < 12:
+        if "installed automatically" in compact.lower():
+            return "UPDATE: new update installed automatically."
+        if "update:" in compact.lower():
+            return "UPDATE: new update available | run `kdx update`"
+    return compact
 
 
 def print_banner(
@@ -191,11 +268,25 @@ def print_banner(
     *,
     environ: dict[str, str] | None = None,
     terminal_width: int | None = None,
+    terminal_height: int | None = None,
 ) -> None:
     target = stream or sys.stderr
-    width = _terminal_width(target, environ=environ, terminal_width=terminal_width)
+    width, height = _terminal_size(
+        target,
+        environ=environ,
+        terminal_width=terminal_width,
+        terminal_height=terminal_height,
+    )
+    banner = render_banner(
+        color=_should_colorize(target, environ=environ),
+        terminal_width=width,
+        terminal_height=height,
+        environ=environ,
+    )
+    if not banner:
+        return
     target.write("\n")
-    target.write(render_banner(color=_should_colorize(target, environ=environ), terminal_width=width))
+    target.write(banner)
     target.write("\n\n")
     target.flush()
 
@@ -209,11 +300,17 @@ def print_launch_panel(
     stream: TextIO | None = None,
     environ: dict[str, str] | None = None,
     terminal_width: int | None = None,
+    terminal_height: int | None = None,
 ) -> None:
     target = stream or sys.stderr
     color = _should_colorize(target, environ=environ)
-    width = _terminal_width(target, environ=environ, terminal_width=terminal_width)
-    print_banner(target, environ=environ, terminal_width=width)
+    width, height = _terminal_size(
+        target,
+        environ=environ,
+        terminal_width=terminal_width,
+        terminal_height=terminal_height,
+    )
+    print_banner(target, environ=environ, terminal_width=width, terminal_height=height)
     target.write(
         render_startup_status(
             repo_root,
@@ -221,10 +318,20 @@ def print_launch_panel(
             keiro_configured=keiro_configured,
             color=color,
             terminal_width=width,
+            terminal_height=height,
         )
     )
     if update_notice:
         target.write("\n")
-        target.write("\n".join(_paint_wrapped(update_notice, _WARNING_COLOR, enabled=color, width=width)))
+        target.write(
+            "\n".join(
+                _paint_wrapped(
+                    _normalize_update_notice(update_notice, width=width, height=height),
+                    _WARNING_COLOR,
+                    enabled=color,
+                    width=width,
+                )
+            )
+        )
     target.write("\n\n")
     target.flush()

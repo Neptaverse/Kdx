@@ -39,18 +39,40 @@ class UiTests(unittest.TestCase):
         )
 
     def test_render_banner_preserves_ascii_art(self) -> None:
-        banner = render_banner(color=False)
+        banner = render_banner(color=False, terminal_width=120, terminal_height=60)
         self.assertEqual(banner, KDX_ASCII_LOGO)
         self.assertIn("@@@@", banner)
         self.assertNotIn("\033[", banner)
 
     def test_render_banner_uses_compact_variant_for_narrow_terminal(self) -> None:
-        banner = render_banner(color=False, terminal_width=60)
-        self.assertEqual(banner, "KDX")
+        banner = render_banner(color=False, terminal_width=40, terminal_height=12)
+        self.assertIn("| KDX |", banner)
+
+    def test_render_banner_hides_when_terminal_is_too_small(self) -> None:
+        banner = render_banner(color=False, terminal_width=30, terminal_height=6)
+        self.assertEqual(banner, "")
+
+    def test_render_banner_respects_off_override(self) -> None:
+        banner = render_banner(
+            color=False,
+            terminal_width=120,
+            terminal_height=60,
+            environ={"KDX_BANNER_STYLE": "off"},
+        )
+        self.assertEqual(banner, "")
+
+    def test_render_banner_force_flag_uses_compact_when_space_is_tight(self) -> None:
+        banner = render_banner(
+            color=False,
+            terminal_width=40,
+            terminal_height=8,
+            environ={"KDX_FORCE_BANNER": "1"},
+        )
+        self.assertIn("| KDX |", banner)
 
     def test_print_banner_respects_color_policy(self) -> None:
         stream = _FakeStream(is_tty=True)
-        print_banner(stream, environ={"KDX_COLOR": "always"})
+        print_banner(stream, environ={"KDX_COLOR": "always"}, terminal_width=120, terminal_height=60)
         output = stream.getvalue()
         self.assertIn("\033[38;5;39m", output)
         self.assertIn("@@@@", output)
@@ -58,12 +80,20 @@ class UiTests(unittest.TestCase):
 
     def test_print_banner_defaults_to_blue_for_interactive_launch(self) -> None:
         stream = _FakeStream(is_tty=True)
-        print_banner(stream, environ={})
+        print_banner(stream, environ={}, terminal_width=120, terminal_height=60)
         self.assertIn("\033[38;5;39m", stream.getvalue())
 
     def test_launch_panel_warns_when_keiro_missing(self) -> None:
         stream = _FakeStream(is_tty=True)
-        print_launch_panel(Path("/tmp/demo"), file_count=42, keiro_configured=False, stream=stream, environ={"KDX_COLOR": "always"})
+        print_launch_panel(
+            Path("/tmp/demo"),
+            file_count=42,
+            keiro_configured=False,
+            stream=stream,
+            environ={"KDX_COLOR": "always"},
+            terminal_width=120,
+            terminal_height=60,
+        )
         output = stream.getvalue()
         self.assertIn("KEIRO: not configured", output)
         self.assertIn("kdx /keiro <api-key>", output)
@@ -79,6 +109,8 @@ class UiTests(unittest.TestCase):
             update_notice="UPDATE: 0.2.0 available (current 0.1.0) | run `kdx update`",
             stream=stream,
             environ={"KDX_COLOR": "always"},
+            terminal_width=120,
+            terminal_height=60,
         )
         output = stream.getvalue()
         self.assertIn("UPDATE: 0.2.0 available", output)
@@ -94,13 +126,33 @@ class UiTests(unittest.TestCase):
             stream=stream,
             environ={"KDX_COLOR": "never"},
             terminal_width=40,
+            terminal_height=10,
         )
         output = _strip_ansi(stream.getvalue())
         lines = [line for line in output.splitlines() if line]
-        self.assertIn("KDX", lines[0])
+        self.assertIn("+-----+", lines[0])
         self.assertTrue(all(len(line) <= 40 for line in lines))
         self.assertIn("KEIRO: not configured", output)
         self.assertIn("UPDATE: new update available", output)
+        self.assertNotIn("auto-update skipped because", output)
+
+    def test_launch_panel_hides_banner_on_tiny_terminal(self) -> None:
+        stream = _FakeStream(is_tty=True)
+        print_launch_panel(
+            Path("/tmp/demo"),
+            file_count=42,
+            keiro_configured=True,
+            update_notice="UPDATE: 0.2.0 available (current 0.1.0) | run `kdx update`",
+            stream=stream,
+            environ={"KDX_COLOR": "never"},
+            terminal_width=30,
+            terminal_height=6,
+        )
+        output = _strip_ansi(stream.getvalue())
+        first_line = next((line for line in output.splitlines() if line), "")
+        self.assertEqual(first_line, "KDX workspace: demo")
+        self.assertNotIn("@@@@", output)
+        self.assertNotIn("| KDX |", output)
 
 
 if __name__ == "__main__":
