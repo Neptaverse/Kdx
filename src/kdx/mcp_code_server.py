@@ -65,7 +65,8 @@ def build_server() -> Any:
     def repo_retrieve(query: str, top_files: int = 6, char_budget: int = 12000) -> dict[str, Any]:
         settings = _settings()
         index = _ensure_index()
-        budget = dataclasses.replace(settings.budget, max_files=max(1, min(12, top_files)), max_total_chars=max(1000, char_budget))
+        token_budget = max(250, char_budget // 4)
+        budget = dataclasses.replace(settings.budget, max_files=max(1, min(12, top_files)), max_total_tokens=token_budget)
         snippets = retrieve_context(settings.repo_root, index, query, budget)
         route = classify_query(query)
         return {

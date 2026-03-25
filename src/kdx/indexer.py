@@ -28,6 +28,8 @@ SKIP_DIRS = {
     ".next",
     ".turbo",
     "__pycache__",
+    "Kdx",
+    "codex",
 }
 SUPPORTED_EXTENSIONS = {
     ".py",
