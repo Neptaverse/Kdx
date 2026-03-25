@@ -9,6 +9,7 @@ import site
 import subprocess
 import sys
 from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parent
 VENV_DIR = ROOT / ".venv"
@@ -25,6 +26,25 @@ def build_env() -> dict[str, str]:
     env.setdefault("PIP_RETRIES", "5")
     env.setdefault("PIP_DISABLE_PIP_VERSION_CHECK", "1")
     return env
+
+
+def _python_runtime_guard_error(version_info: Any | None = None) -> str:
+    info = version_info or sys.version_info
+    release_level = str(getattr(info, "releaselevel", "final"))
+    if release_level == "final":
+        return ""
+    major = int(getattr(info, "major", 0))
+    minor = int(getattr(info, "minor", 0))
+    micro = int(getattr(info, "micro", 0))
+    serial = int(getattr(info, "serial", 0))
+    suffix_map = {"alpha": "a", "beta": "b", "candidate": "rc"}
+    suffix = suffix_map.get(release_level, release_level)
+    detected = f"{major}.{minor}.{micro}{suffix}{serial if serial else ''}"
+    return (
+        "KDX bootstrap requires a stable Python release. "
+        f"Detected prerelease interpreter: {detected}.\n"
+        "Use Python 3.11 or 3.12 final, then rerun bootstrap."
+    )
 
 
 def run(command: list[str], *, env: dict[str, str] | None = None, check: bool = True) -> subprocess.CompletedProcess[str]:
@@ -102,6 +122,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--reset", action="store_true", help="delete .venv before reinstalling")
     parser.add_argument("--python", action="store_true", help="run the venv Python directly instead of launching KDX")
     args, passthrough = parser.parse_known_args(argv)
+
+    runtime_error = _python_runtime_guard_error()
+    if runtime_error:
+        print(runtime_error, file=sys.stderr)
+        return 2
 
     python_bin = ensure_environment(reset=args.reset)
     launcher_info = None

@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
+from types import SimpleNamespace
 
 import bootstrap
 
@@ -55,6 +56,28 @@ class BootstrapTests(unittest.TestCase):
             content = launcher.read_text(encoding='utf-8')
             self.assertIn('bootstrap.py', content)
             self.assertEqual(info['status'], 'created')
+
+    def test_python_runtime_guard_rejects_prerelease(self) -> None:
+        fake = SimpleNamespace(
+            major=3,
+            minor=12,
+            micro=0,
+            releaselevel='candidate',
+            serial=1,
+        )
+        message = bootstrap._python_runtime_guard_error(fake)
+        self.assertIn('stable Python release', message)
+        self.assertIn('3.12.0rc1', message)
+
+    def test_python_runtime_guard_allows_final_release(self) -> None:
+        fake = SimpleNamespace(
+            major=3,
+            minor=12,
+            micro=5,
+            releaselevel='final',
+            serial=0,
+        )
+        self.assertEqual(bootstrap._python_runtime_guard_error(fake), '')
 
 
 if __name__ == '__main__':

@@ -20,63 +20,88 @@ Repository: `https://github.com/Neptaverse/Kdx.git`
 
 ## Quick Start
 
-Choose the command set for your OS. These paths are more stable across dependency/toolchain differences.
+Use the 2-line installer for your OS.
 
-### Linux (bash)
+### Linux (2 lines)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Neptaverse/Kdx/main/bin/install-linux.sh | bash
+kdx
+```
+
+Manual fallback:
 
 ```bash
 git clone https://github.com/Neptaverse/Kdx.git
 cd Kdx
-
-python3 --version
 python3 bootstrap.py --setup-only
 kdx
 ```
 
-If `python3 -m venv` is missing on Debian/Ubuntu, install it once and retry:
+If `python3 -m venv` is missing on Debian/Ubuntu:
 
 ```bash
 sudo apt-get update
 sudo apt-get install -y python3-venv
 ```
 
-### macOS (zsh/bash)
+### macOS (2 lines)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Neptaverse/Kdx/main/bin/install-macos.sh | bash
+kdx
+```
+
+Manual fallback:
 
 ```bash
 git clone https://github.com/Neptaverse/Kdx.git
 cd Kdx
-
-python3 --version
 python3 bootstrap.py --setup-only
 kdx
 ```
 
-If you hit compiler/toolchain errors, install Apple command line tools and rerun:
+If you hit toolchain errors:
 
 ```bash
 xcode-select --install
 ```
 
-If `python3` is not installed, install a stable Python first (for example Homebrew Python 3.12) and rerun the same commands.
+If `python3` is prerelease (for example `3.12.0rc1`), use stable 3.11 and reset:
 
-### Windows (PowerShell)
+```bash
+python3.11 bootstrap.py --reset --setup-only
+```
+
+If `kdx` is installed but not found, add the launcher bin dir printed by Python:
+
+```bash
+BIN_DIR="$(python3.11 -c 'import site, pathlib; print(pathlib.Path(site.getuserbase()) / "bin")')"
+export PATH="$BIN_DIR:$PATH"
+echo "export PATH=\"$BIN_DIR:\$PATH\"" >> ~/.zprofile
+```
+
+### Windows (PowerShell, 2 lines)
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -Command "irm https://raw.githubusercontent.com/Neptaverse/Kdx/main/bin/install-windows.ps1 | iex"
+kdx
+```
+
+Manual fallback:
 
 ```powershell
 git clone https://github.com/Neptaverse/Kdx.git
 cd Kdx
-
-py -3.12 --version
 py -3.12 bootstrap.py --setup-only
 kdx
 ```
 
-If `py -3.12` is not available, use `py -3` instead.
+If `py -3.12` is not available, use `py -3.11` or `py -3`.
 
-The bootstrap step creates the local `.venv`, installs KDX, and installs a user-level `kdx` launcher. After the first setup, use `kdx` directly from any directory.
+The bootstrap step creates the local `.venv`, installs KDX, and installs a user-level `kdx` launcher. After setup, use `kdx` directly from any directory.
 
-If `kdx` still says `command not found` after setup, the bootstrap step will have printed the exact directory you need to add to `PATH`. Open a new terminal after updating `PATH`.
-
-If you are inside Conda and the install still misbehaves, run `conda deactivate` first, then run the same setup commands again.
+If you are inside Conda and install misbehaves, run `conda deactivate` first and retry.
 
 If you already have a broken environment, reset it fully:
 
@@ -84,7 +109,7 @@ If you already have a broken environment, reset it fully:
 python3 bootstrap.py --reset --setup-only
 ```
 
-Windows equivalent:
+Windows reset:
 
 ```powershell
 py -3.12 bootstrap.py --reset --setup-only
@@ -92,13 +117,7 @@ py -3.12 bootstrap.py --reset --setup-only
 
 `bootstrap.py` intentionally keeps the packaging toolchain below the current `pip 26` line because that release has caused editable-install failures in some environments.
 
-If the script fails with a PyPI `ReadTimeoutError`, that is just a network timeout while downloading packages. Run it again:
-
-```bash
-python3 bootstrap.py --setup-only
-```
-
-The bootstrap flow already uses a longer pip timeout and retry budget by default.
+If setup fails with a PyPI `ReadTimeoutError`, run the same setup command again. The bootstrap flow already uses longer timeout and retries.
 
 ## Common Commands
 
