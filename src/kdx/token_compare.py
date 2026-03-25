@@ -13,7 +13,7 @@ from typing import Any
 
 from kdx.codex_home import prepared_codex_home
 from kdx.config import KdxSettings, load_settings
-from kdx.wrapper import KDX_SESSION_INSTRUCTIONS, build_execution_plan
+from kdx.wrapper import KDX_CODEX_CONFIG_OVERRIDES, KDX_SESSION_INSTRUCTIONS, build_execution_plan
 
 
 def parse_turn_usage(stdout: str) -> dict[str, int]:
@@ -153,7 +153,14 @@ def _run_kdx(
         if settings.keiro_api_key:
             env["KDX_KEIRO_API_KEY"] = settings.keiro_api_key
         env["PYTHONPATH"] = package_src if not env.get("PYTHONPATH") else f"{package_src}{os.pathsep}{env['PYTHONPATH']}"
-        stdout = _run_codex_exec(settings, prompt, env=env, model=model, timeout_seconds=timeout_seconds)
+        stdout = _run_codex_exec(
+            settings,
+            prompt,
+            env=env,
+            model=model,
+            timeout_seconds=timeout_seconds,
+            config_overrides=KDX_CODEX_CONFIG_OVERRIDES,
+        )
     return parse_turn_usage(stdout)
 
 
@@ -164,18 +171,14 @@ def _run_codex_exec(
     env: dict[str, str],
     model: str,
     timeout_seconds: int,
+    config_overrides: tuple[str, ...] = (),
 ) -> str:
-    command = [
-        settings.codex_binary,
-        "exec",
-        "--json",
-        "--skip-git-repo-check",
-        "-C",
-        str(settings.repo_root),
-        "--model",
-        model,
+    command = _build_codex_exec_command(
+        settings,
         prompt,
-    ]
+        model=model,
+        config_overrides=config_overrides,
+    )
     result = subprocess.run(
         command,
         cwd=str(settings.repo_root),
@@ -188,6 +191,29 @@ def _run_codex_exec(
     if result.returncode != 0:
         raise RuntimeError(f"codex exec failed: stderr={result.stderr[-1000:]} stdout={result.stdout[-1000:]}")
     return result.stdout
+
+
+def _build_codex_exec_command(
+    settings: KdxSettings,
+    prompt: str,
+    *,
+    model: str,
+    config_overrides: tuple[str, ...] = (),
+) -> list[str]:
+    command = [
+        settings.codex_binary,
+        "exec",
+        "--json",
+        "--skip-git-repo-check",
+        "-C",
+        str(settings.repo_root),
+        "--model",
+        model,
+    ]
+    for override in config_overrides:
+        command.extend(["-c", override])
+    command.append(prompt)
+    return command
 
 
 @contextmanager

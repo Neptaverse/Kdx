@@ -162,7 +162,7 @@ Source files are preferred by default. Tests, docs, config, and bench files are 
 
 ### Web search
 
-For external or freshness-sensitive questions, KDX calls Keiro through its own MCP server. Search planning is intent-based: docs, release notes, error lookups, research, and general web queries do not all take the same path.
+For external or freshness-sensitive questions, KDX calls Keiro through its own MCP server. Search planning is intent-based: docs, release notes, error lookups, research, and general web queries do not all take the same path. KDX disables Codex native web search for KDX sessions so web lookups stay on the Keiro path.
 
 ### Codex runtime
 
@@ -171,6 +171,7 @@ KDX launches the real `codex` binary with:
 - a temporary `CODEX_HOME`
 - KDX MCP servers injected into `config.toml`
 - your existing Codex auth and rules copied forward
+- Codex launch overrides that keep native `web_search` disabled in KDX sessions
 - a small set of session instructions tuned for evidence-first repo work
 
 ## Keiro Setup

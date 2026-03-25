@@ -58,10 +58,22 @@ KDX_SESSION_INSTRUCTIONS = "\n".join(
         "You are running under KDX, a Codex wrapper optimized for token efficiency and evidence-driven coding.",
         "Use the `kdx_repo` MCP tools for repo understanding before broad shell reads, starting with `repo_retrieve` and `repo_read`.",
         "Use the `kdx_web` MCP tools for external or fresh knowledge instead of guessing, starting with `keiro_context_search` and `keiro_fetch_best`.",
+        "Do not use Codex native web search tools in KDX sessions; only use Keiro via `kdx_web`.",
         "Prefer symbol-targeted reads, compact evidence, and the smallest sufficient context.",
         "Wait for the user's first task before taking action.",
     ]
 )
+KDX_CODEX_CONFIG_OVERRIDES = (
+    "web_search=false",
+    'disabled_tools=["web_search"]',
+    "features.web_search_request=false",
+    "features.web_search_cached=false",
+)
+
+
+def append_kdx_codex_overrides(command: list[str]) -> None:
+    for override in KDX_CODEX_CONFIG_OVERRIDES:
+        command.extend(["-c", override])
 
 
 def ensure_index(settings: KdxSettings) -> ProjectIndex:
@@ -271,6 +283,7 @@ def run_codex(query: str, *, exec_mode: bool = False, use_web: bool | None = Non
         command = [settings.codex_binary]
         if exec_mode:
             command.append("exec")
+        append_kdx_codex_overrides(command)
         if model or settings.model:
             command.extend(["--model", model or settings.model])
         if plan["prompt"]:

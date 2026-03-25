@@ -7,7 +7,14 @@ import tempfile
 from kdx.budget import BudgetConfig
 from kdx.config import KdxSettings
 from kdx.retrieval import build_query_profile
-from kdx.wrapper import build_execution_plan, should_auto_update_on_startup, should_preload_web
+from kdx.wrapper import (
+    KDX_CODEX_CONFIG_OVERRIDES,
+    KDX_SESSION_INSTRUCTIONS,
+    append_kdx_codex_overrides,
+    build_execution_plan,
+    should_auto_update_on_startup,
+    should_preload_web,
+)
 
 
 class WrapperTests(unittest.TestCase):
@@ -51,6 +58,17 @@ class WrapperTests(unittest.TestCase):
         self.assertFalse(should_auto_update_on_startup("fix bug", exec_mode=False, environ={}))
         self.assertFalse(should_auto_update_on_startup("", exec_mode=True, environ={}))
         self.assertFalse(should_auto_update_on_startup("", exec_mode=False, environ={"KDX_NO_AUTO_UPDATE": "1"}))
+
+    def test_kdx_appends_codex_overrides_to_disable_native_web_search(self) -> None:
+        command = ["codex", "exec"]
+        append_kdx_codex_overrides(command)
+        expected = ["codex", "exec"]
+        for override in KDX_CODEX_CONFIG_OVERRIDES:
+            expected.extend(["-c", override])
+        self.assertEqual(command, expected)
+
+    def test_session_instructions_force_keiro_web_path(self) -> None:
+        self.assertIn("Do not use Codex native web search tools in KDX sessions", KDX_SESSION_INSTRUCTIONS)
 
 
 if __name__ == "__main__":
