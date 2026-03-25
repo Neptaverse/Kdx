@@ -55,6 +55,13 @@ def _strip_tables_by_prefix(config_text: str, prefix: str) -> str:
 
 
 def _drop_web_search_assignments(config_text: str) -> str:
+    blocked_keys = {
+        "web_search",
+        "web_search_cached",
+        "web_search_request",
+        "features.web_search_cached",
+        "features.web_search_request",
+    }
     output: list[str] = []
     for line in config_text.splitlines():
         stripped = line.strip()
@@ -64,7 +71,7 @@ def _drop_web_search_assignments(config_text: str) -> str:
         config_part = stripped.split("#", 1)[0].strip()
         if "=" in config_part:
             key = config_part.split("=", 1)[0].strip()
-            if key == "web_search":
+            if key in blocked_keys:
                 continue
         output.append(line)
     return "\n".join(output).strip() + "\n"

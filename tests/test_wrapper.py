@@ -66,6 +66,8 @@ class WrapperTests(unittest.TestCase):
         for override in KDX_CODEX_CONFIG_OVERRIDES:
             expected.extend(["-c", override])
         self.assertEqual(command, expected)
+        self.assertTrue(all("web_search_request" not in override for override in KDX_CODEX_CONFIG_OVERRIDES))
+        self.assertTrue(all("web_search_cached" not in override for override in KDX_CODEX_CONFIG_OVERRIDES))
 
     def test_session_instructions_force_keiro_web_path(self) -> None:
         self.assertIn("Do not use Codex native web search tools in KDX sessions", KDX_SESSION_INSTRUCTIONS)

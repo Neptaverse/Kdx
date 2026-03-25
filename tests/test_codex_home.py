@@ -63,7 +63,21 @@ class CodexHomeTests(unittest.TestCase):
             base_home.mkdir(parents=True)
             (base_home / "auth.json").write_text("{}", encoding="utf-8")
             (base_home / "config.toml").write_text(
-                'model = "gpt-5.4"\nweb_search = false\n\n[profile.fast]\nmodel = "gpt-5.4-mini"\nweb_search = true\n',
+                'model = "gpt-5.4"\n'
+                "web_search = false\n"
+                "features.web_search_request = false\n"
+                "\n"
+                "[features]\n"
+                "multi_agent = true\n"
+                "web_search_cached = false\n"
+                "\n"
+                "[profile.fast]\n"
+                'model = "gpt-5.4-mini"\n'
+                "web_search = true\n"
+                "\n"
+                "[profile.fast.features]\n"
+                "multi_agent = false\n"
+                "web_search_request = true\n",
                 encoding="utf-8",
             )
             settings = KdxSettings(
@@ -85,8 +99,15 @@ class CodexHomeTests(unittest.TestCase):
                 config = (temp_home / "config.toml").read_text(encoding="utf-8")
                 self.assertNotIn("web_search = false", config)
                 self.assertNotIn("web_search = true", config)
+                self.assertNotIn("features.web_search_request", config)
+                self.assertNotIn("web_search_cached", config)
+                self.assertNotIn("web_search_request", config)
+                self.assertIn("[features]", config)
+                self.assertIn("multi_agent = true", config)
                 self.assertIn('[profile.fast]', config)
                 self.assertIn('model = "gpt-5.4-mini"', config)
+                self.assertIn("[profile.fast.features]", config)
+                self.assertIn("multi_agent = false", config)
 
 if __name__ == "__main__":
     unittest.main()
