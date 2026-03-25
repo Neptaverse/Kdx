@@ -20,20 +20,59 @@ Repository: `https://github.com/Neptaverse/Kdx.git`
 
 ## Quick Start
 
+Choose the command set for your OS. These paths are more stable across dependency/toolchain differences.
+
+### Linux (bash)
+
 ```bash
 git clone https://github.com/Neptaverse/Kdx.git
 cd Kdx
 
-python bootstrap.py --setup-only
+python3 --version
+python3 bootstrap.py --setup-only
 kdx
 ```
 
-The bootstrap step creates the local `.venv`, installs KDX, and installs a user-level `kdx` launcher. After that first setup step, use `kdx` directly from any directory.
+If `python3 -m venv` is missing on Debian/Ubuntu, install it once and retry:
 
-If `python` is not the right launcher on your machine, use the platform equivalent:
+```bash
+sudo apt-get update
+sudo apt-get install -y python3-venv
+```
 
-- Windows: `py -3 bootstrap.py --setup-only`
-- macOS/Linux with a `python3`-only install: `python3 bootstrap.py --setup-only`
+### macOS (zsh/bash)
+
+```bash
+git clone https://github.com/Neptaverse/Kdx.git
+cd Kdx
+
+python3 --version
+python3 bootstrap.py --setup-only
+kdx
+```
+
+If you hit compiler/toolchain errors, install Apple command line tools and rerun:
+
+```bash
+xcode-select --install
+```
+
+If `python3` is not installed, install a stable Python first (for example Homebrew Python 3.12) and rerun the same commands.
+
+### Windows (PowerShell)
+
+```powershell
+git clone https://github.com/Neptaverse/Kdx.git
+cd Kdx
+
+py -3.12 --version
+py -3.12 bootstrap.py --setup-only
+kdx
+```
+
+If `py -3.12` is not available, use `py -3` instead.
+
+The bootstrap step creates the local `.venv`, installs KDX, and installs a user-level `kdx` launcher. After the first setup, use `kdx` directly from any directory.
 
 If `kdx` still says `command not found` after setup, the bootstrap step will have printed the exact directory you need to add to `PATH`. Open a new terminal after updating `PATH`.
 
@@ -42,7 +81,13 @@ If you are inside Conda and the install still misbehaves, run `conda deactivate`
 If you already have a broken environment, reset it fully:
 
 ```bash
-python bootstrap.py --reset --setup-only
+python3 bootstrap.py --reset --setup-only
+```
+
+Windows equivalent:
+
+```powershell
+py -3.12 bootstrap.py --reset --setup-only
 ```
 
 `bootstrap.py` intentionally keeps the packaging toolchain below the current `pip 26` line because that release has caused editable-install failures in some environments.
@@ -50,7 +95,7 @@ python bootstrap.py --reset --setup-only
 If the script fails with a PyPI `ReadTimeoutError`, that is just a network timeout while downloading packages. Run it again:
 
 ```bash
-python bootstrap.py --setup-only
+python3 bootstrap.py --setup-only
 ```
 
 The bootstrap flow already uses a longer pip timeout and retry budget by default.
@@ -161,6 +206,31 @@ KDX writes local runtime data to:
 - `~/.kdx/config.json` for the persisted Keiro key
 
 The repo-local `.kdx/` directory is intentionally ignored and should not be committed.
+
+## Uninstall
+
+### Linux and macOS
+
+Remove the launcher, user-level config/cache, and repo-local runtime data:
+
+```bash
+rm -f "$(python3 -c 'import site, pathlib; print(pathlib.Path(site.getuserbase()) / "bin" / "kdx")')"
+rm -rf ~/.kdx
+rm -rf .kdx .venv
+```
+
+Then delete the cloned repository directory when you are done.
+
+### Windows (PowerShell)
+
+```powershell
+$base = py -3 -c "import site; print(site.getuserbase())"
+Remove-Item "$base\Scripts\kdx.cmd" -Force -ErrorAction SilentlyContinue
+Remove-Item "$env:USERPROFILE\.kdx" -Recurse -Force -ErrorAction SilentlyContinue
+Remove-Item ".kdx",".venv" -Recurse -Force -ErrorAction SilentlyContinue
+```
+
+Then delete the cloned repository directory when you are done.
 
 ## Token Comparison
 
