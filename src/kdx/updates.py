@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from kdx import __version__
-from kdx.config import KdxSettings
+from kdx.config import KdxSettings, load_settings
 
 REPOSITORY_URL = "https://github.com/Neptaverse/Kdx"
 GITHUB_RELEASES_API = "https://api.github.com/repos/Neptaverse/Kdx/releases/latest"
@@ -23,7 +23,19 @@ UPDATE_CACHE_FILENAME = "update-check.json"
 DEFAULT_TIMEOUT_SECONDS = 2
 DEFAULT_TTL_SECONDS = 43_200
 _TRUTHY = {"1", "true", "yes", "on"}
+_FALSY = {"0", "false", "no", "off"}
 _VERSION_RE = re.compile(r"\d+")
+
+
+def kdx_install_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
+def update_settings(base: KdxSettings | None = None) -> KdxSettings:
+    root = kdx_install_root()
+    if base is not None and base.repo_root == root:
+        return base
+    return load_settings(root)
 
 
 def update_cache_path(settings: KdxSettings) -> Path:
@@ -33,6 +45,14 @@ def update_cache_path(settings: KdxSettings) -> Path:
 def should_check_for_updates(environ: dict[str, str] | None = None) -> bool:
     env = os.environ if environ is None else environ
     return env.get("KDX_NO_UPDATE_CHECK", "").strip().lower() not in _TRUTHY
+
+
+def should_auto_apply_updates(environ: dict[str, str] | None = None) -> bool:
+    env = os.environ if environ is None else environ
+    if env.get("KDX_NO_AUTO_UPDATE", "").strip().lower() in _TRUTHY:
+        return False
+    value = env.get("KDX_AUTO_UPDATE", "1").strip().lower()
+    return value not in _FALSY
 
 
 def check_for_updates(
@@ -94,7 +114,7 @@ def format_update_notice(status: dict[str, Any]) -> str:
     if latest:
         return f"UPDATE: {latest} available (current {current}) | run `kdx update`"
     if status.get("latest_commit"):
-        return "UPDATE: newer GitHub commit available | run `kdx update`"
+        return "UPDATE: new update available | run `kdx update`"
     return ""
 
 

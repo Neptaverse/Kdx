@@ -203,13 +203,16 @@ kdx update --check-now
 
 `kdx update` applies the update by default.
 
-Interactive startup also performs a cached update check and shows a short notice when a newer version is available.
+Interactive startup (`kdx` with no prompt) checks for updates and auto-applies a new update when safe.
+
+If auto-update cannot run (for example local git changes in the KDX install clone), KDX shows a notice and continues.
 
 The check is intentionally lightweight:
 
 - GitHub-backed
 - cached locally in `~/.kdx/update-check.json`
 - disabled with `KDX_NO_UPDATE_CHECK=1`
+- auto-update can be disabled with `KDX_NO_AUTO_UPDATE=1` (or `KDX_AUTO_UPDATE=0`)
 
 Rollback stays explicit:
 

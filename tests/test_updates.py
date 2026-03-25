@@ -7,7 +7,15 @@ from pathlib import Path
 
 from kdx.budget import BudgetConfig
 from kdx.config import KdxSettings
-from kdx.updates import check_for_updates, format_update_notice, normalize_version_tag, update_actions
+from kdx.updates import (
+    check_for_updates,
+    format_update_notice,
+    kdx_install_root,
+    normalize_version_tag,
+    should_auto_apply_updates,
+    update_settings,
+    update_actions,
+)
 
 
 class UpdateTests(unittest.TestCase):
@@ -70,6 +78,9 @@ class UpdateTests(unittest.TestCase):
             )
             self.assertEqual(status["latest_commit"], "abc123")
             self.assertTrue("current_commit" in status)
+            notice = format_update_notice(status | {"update_available": True})
+            self.assertIn("new update available", notice)
+            self.assertNotIn("commit", notice.lower())
 
     def test_update_actions_do_not_expose_stay_option(self) -> None:
         actions = update_actions({"current_version": "0.1.0", "latest_version": "0.2.0"})
@@ -78,6 +89,17 @@ class UpdateTests(unittest.TestCase):
         self.assertNotIn("stay", actions)
         self.assertIn("bootstrap.py", actions["update"])
         self.assertIn("bootstrap.py", actions["rollback"])
+
+    def test_should_auto_apply_updates_defaults_on(self) -> None:
+        self.assertTrue(should_auto_apply_updates({}))
+        self.assertFalse(should_auto_apply_updates({"KDX_NO_AUTO_UPDATE": "1"}))
+        self.assertFalse(should_auto_apply_updates({"KDX_AUTO_UPDATE": "0"}))
+
+    def test_update_settings_targets_kdx_install_root(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            base = _settings_for(Path(temp_dir))
+            resolved = update_settings(base)
+            self.assertEqual(resolved.repo_root, kdx_install_root())
 
 
 def _settings_for(temp_dir: Path) -> KdxSettings:

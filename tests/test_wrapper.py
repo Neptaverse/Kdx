@@ -7,7 +7,7 @@ import tempfile
 from kdx.budget import BudgetConfig
 from kdx.config import KdxSettings
 from kdx.retrieval import build_query_profile
-from kdx.wrapper import build_execution_plan, should_preload_web
+from kdx.wrapper import build_execution_plan, should_auto_update_on_startup, should_preload_web
 
 
 class WrapperTests(unittest.TestCase):
@@ -45,6 +45,12 @@ class WrapperTests(unittest.TestCase):
             self.assertEqual(plan["route"].mode, "startup")
             self.assertEqual(plan["prompt"], "")
             self.assertEqual(plan["summary"]["budget"]["input_tokens_estimate"], 0)
+
+    def test_auto_update_only_on_interactive_startup(self) -> None:
+        self.assertTrue(should_auto_update_on_startup("", exec_mode=False, environ={}))
+        self.assertFalse(should_auto_update_on_startup("fix bug", exec_mode=False, environ={}))
+        self.assertFalse(should_auto_update_on_startup("", exec_mode=True, environ={}))
+        self.assertFalse(should_auto_update_on_startup("", exec_mode=False, environ={"KDX_NO_AUTO_UPDATE": "1"}))
 
 
 if __name__ == "__main__":

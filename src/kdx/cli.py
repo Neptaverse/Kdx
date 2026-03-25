@@ -10,7 +10,7 @@ from kdx.config import clear_keiro_api_key, load_settings, set_keiro_api_key
 from kdx.indexer import scan_project
 from kdx.keiro import KeiroClient, KeiroError, normalize_results
 from kdx.token_compare import compare_prompt_tokens, compare_prompts_file
-from kdx.updates import apply_update, check_for_updates, update_actions
+from kdx.updates import apply_update, check_for_updates, update_actions, update_settings
 from kdx.wrapper import build_execution_plan, format_plan, run_codex
 
 SUBCOMMANDS = {"scan", "plan", "search", "run", "keiro", "tokens", "update"}
@@ -171,7 +171,7 @@ def _cmd_tokens(args: argparse.Namespace) -> int:
 
 
 def _cmd_update(args: argparse.Namespace) -> int:
-    settings = load_settings()
+    settings = update_settings(load_settings())
     status = check_for_updates(settings, force=args.check_now or args.check)
     actions = update_actions(status)
     if args.check or args.json:
@@ -186,7 +186,7 @@ def _cmd_update(args: argparse.Namespace) -> int:
             if status.get("latest_version"):
                 print(f"latest:  {status['latest_version']}")
             elif status.get("latest_commit"):
-                print(f"latest commit: {status['latest_commit'][:12]}")
+                print(f"latest update: {status['latest_commit'][:12]}")
             if status.get("update_available"):
                 print("status:  update available")
             elif status.get("ok"):

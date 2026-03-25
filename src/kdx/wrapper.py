@@ -26,7 +26,14 @@ from kdx.retrieval import (
 )
 from kdx.search_service import execute_context_search, render_web_evidence_block
 from kdx.ui import print_launch_panel, should_render_banner
-from kdx.updates import check_for_updates, format_update_notice, should_check_for_updates
+from kdx.updates import (
+    apply_update,
+    check_for_updates,
+    format_update_notice,
+    should_auto_apply_updates,
+    should_check_for_updates,
+    update_settings,
+)
 
 STRONG_WEB_TERMS = {
     "latest",
@@ -108,6 +115,17 @@ def should_preload_web(
     if profile.answer_only and has_local_context:
         return False
     return False
+
+
+def should_auto_update_on_startup(
+    query: str,
+    *,
+    exec_mode: bool,
+    environ: dict[str, str] | None = None,
+) -> bool:
+    if exec_mode or query.strip():
+        return False
+    return should_auto_apply_updates(environ)
 
 
 def build_bootstrap_prompt(
@@ -213,6 +231,25 @@ def build_execution_plan(query: str, settings: KdxSettings | None = None, use_we
 def run_codex(query: str, *, exec_mode: bool = False, use_web: bool | None = None, model: str | None = None) -> int:
     _ensure_mcp_runtime()
     settings = load_settings()
+    updater_settings = update_settings(settings)
+    env = os.environ.copy()
+    update_notice = ""
+    if should_check_for_updates(env):
+        status = check_for_updates(updater_settings, environ=env)
+        should_auto_update = (
+            should_auto_update_on_startup(query, exec_mode=exec_mode, environ=env)
+            and bool(status.get("update_available"))
+        )
+        if should_auto_update:
+            try:
+                apply_update(updater_settings)
+                updater_settings = update_settings(updater_settings)
+                status = check_for_updates(updater_settings, environ=env)
+                update_notice = "UPDATE: new update installed automatically."
+            except Exception as exc:
+                update_notice = f"UPDATE: new update available (auto-update skipped: {exc}) | run `kdx update`"
+        if not update_notice:
+            update_notice = format_update_notice(status)
     index = initialize_workspace(settings)
     plan = build_execution_plan(query, settings=settings, use_web=use_web)
     if query.strip():
@@ -221,7 +258,6 @@ def run_codex(query: str, *, exec_mode: bool = False, use_web: bool | None = Non
             make_history_entry(query, plan["route"], plan["snippets"], plan["search_queries"]),
         )
     with prepared_codex_home(settings, session_instructions=KDX_SESSION_INSTRUCTIONS) as codex_home:
-        env = os.environ.copy()
         env["CODEX_HOME"] = str(codex_home)
         env["CODEX_SQLITE_HOME"] = str(settings.base_codex_home)
         env["KDX_PROJECT_ROOT"] = str(settings.repo_root)
@@ -240,10 +276,6 @@ def run_codex(query: str, *, exec_mode: bool = False, use_web: bool | None = Non
         if plan["prompt"]:
             command.append(plan["prompt"])
         if should_render_banner(exec_mode=exec_mode, environ=env):
-            update_notice = ""
-            if should_check_for_updates(env):
-                status = check_for_updates(settings, environ=env)
-                update_notice = format_update_notice(status)
             print_launch_panel(
                 settings.repo_root,
                 file_count=index.file_count if index is not None else None,
