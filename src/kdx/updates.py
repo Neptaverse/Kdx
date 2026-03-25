@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import urllib.error
@@ -25,6 +26,9 @@ DEFAULT_TTL_SECONDS = 43_200
 _TRUTHY = {"1", "true", "yes", "on"}
 _FALSY = {"0", "false", "no", "off"}
 _VERSION_RE = re.compile(r"\d+")
+_SAFE_GENERATED_PREFIXES = (".kdx/", ".venv/", "src/kdx.egg-info/")
+_SAFE_GENERATED_MARKERS = ("/__pycache__/", "__pycache__/")
+_SAFE_GENERATED_SUFFIXES = (".pyc",)
 
 
 def kdx_install_root() -> Path:
@@ -131,9 +135,15 @@ def update_actions(status: dict[str, Any]) -> dict[str, str]:
 def apply_update(settings: KdxSettings, *, rollback_ref: str = "") -> dict[str, Any]:
     if not (settings.repo_root / ".git").exists():
         raise RuntimeError("auto update requires a git clone")
-    dirty = _git_output(settings, ["status", "--short"])
-    if dirty.strip():
-        raise RuntimeError("refusing to update because the repo has local changes")
+    safe_dirty, unsafe_dirty = _partition_dirty_paths(_dirty_paths(settings))
+    if safe_dirty:
+        _cleanup_safe_generated_paths(settings, safe_dirty)
+        safe_dirty, unsafe_dirty = _partition_dirty_paths(_dirty_paths(settings))
+    if unsafe_dirty:
+        preview = ", ".join(unsafe_dirty[:4])
+        if len(unsafe_dirty) > 4:
+            preview += ", ..."
+        raise RuntimeError(f"refusing to update because the install repo has local changes: {preview}")
     _run(settings, ["git", "-C", str(settings.repo_root), "fetch", "--tags", "--prune"])
     if rollback_ref.strip():
         _run(settings, ["git", "-C", str(settings.repo_root), "checkout", rollback_ref.strip()])
@@ -309,6 +319,79 @@ def current_commit(settings: KdxSettings) -> str:
     if result.returncode != 0:
         return ""
     return result.stdout.strip()
+
+
+def _dirty_paths(settings: KdxSettings) -> list[str]:
+    output = _git_output(settings, ["status", "--porcelain", "--untracked-files=normal"])
+    paths: list[str] = []
+    for line in output.splitlines():
+        if len(line) < 4:
+            continue
+        raw_path = line[3:].strip()
+        if " -> " in raw_path:
+            raw_path = raw_path.split(" -> ", 1)[1].strip()
+        normalized = raw_path.replace("\\", "/")
+        if normalized:
+            paths.append(normalized)
+    return paths
+
+
+def _partition_dirty_paths(paths: list[str]) -> tuple[list[str], list[str]]:
+    safe: list[str] = []
+    unsafe: list[str] = []
+    for path in paths:
+        if _is_safe_generated_path(path):
+            safe.append(path)
+        else:
+            unsafe.append(path)
+    return safe, unsafe
+
+
+def _is_safe_generated_path(path: str) -> bool:
+    normalized = path.replace("\\", "/")
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    if normalized.startswith(_SAFE_GENERATED_PREFIXES):
+        return True
+    if any(marker in normalized for marker in _SAFE_GENERATED_MARKERS):
+        return True
+    return normalized.endswith(_SAFE_GENERATED_SUFFIXES)
+
+
+def _cleanup_safe_generated_paths(settings: KdxSettings, paths: list[str]) -> None:
+    for path in sorted(set(paths)):
+        _restore_or_remove_path(settings, path)
+
+
+def _restore_or_remove_path(settings: KdxSettings, path: str) -> None:
+    target = (settings.repo_root / path).resolve()
+    try:
+        target.relative_to(settings.repo_root.resolve())
+    except ValueError:
+        return
+    if not target.exists():
+        return
+    tracked = _git_path_is_tracked(settings, path)
+    if tracked:
+        _run(settings, ["git", "-C", str(settings.repo_root), "restore", "--worktree", "--staged", "--", path])
+        return
+    if target.is_dir():
+        shutil.rmtree(target, ignore_errors=True)
+    else:
+        try:
+            target.unlink()
+        except OSError:
+            return
+
+
+def _git_path_is_tracked(settings: KdxSettings, path: str) -> bool:
+    result = subprocess.run(
+        ["git", "-C", str(settings.repo_root), "ls-files", "--error-unmatch", "--", path],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.returncode == 0
 
 
 def _git_output(settings: KdxSettings, args: list[str]) -> str:

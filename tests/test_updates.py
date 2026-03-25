@@ -8,6 +8,7 @@ from pathlib import Path
 from kdx.budget import BudgetConfig
 from kdx.config import KdxSettings
 from kdx.updates import (
+    _partition_dirty_paths,
     check_for_updates,
     format_update_notice,
     kdx_install_root,
@@ -100,6 +101,21 @@ class UpdateTests(unittest.TestCase):
             base = _settings_for(Path(temp_dir))
             resolved = update_settings(base)
             self.assertEqual(resolved.repo_root, kdx_install_root())
+
+    def test_partition_dirty_paths_keeps_generated_files_safe(self) -> None:
+        safe, unsafe = _partition_dirty_paths(
+            [
+                ".venv/",
+                ".kdx/",
+                "src/kdx.egg-info/",
+                "__pycache__/bootstrap.cpython-312.pyc",
+                "src/kdx/__pycache__/ui.cpython-312.pyc",
+                "src/kdx/ui.py",
+            ]
+        )
+        self.assertIn(".venv/", safe)
+        self.assertIn("__pycache__/bootstrap.cpython-312.pyc", safe)
+        self.assertIn("src/kdx/ui.py", unsafe)
 
 
 def _settings_for(temp_dir: Path) -> KdxSettings:
