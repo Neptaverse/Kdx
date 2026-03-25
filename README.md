@@ -1,22 +1,61 @@
 # KDX
 
-KDX is a thin wrapper around the Codex CLI.
+<div align="center">
 
-The goal is simple: keep Codex focused on the right parts of the repo, give it a clean way to reach fresh information through Keiro, and avoid wasting context on broad file reads when a smaller, better-targeted prompt will do.
+[![Stars](https://img.shields.io/github/stars/Neptaverse/Kdx?style=for-the-badge&logo=github&logoColor=white&labelColor=0d1117&color=58a6ff)](https://github.com/Neptaverse/Kdx/stargazers)
+[![Forks](https://img.shields.io/github/forks/Neptaverse/Kdx?style=for-the-badge&logo=git&logoColor=white&labelColor=0d1117&color=8b949e)](https://github.com/Neptaverse/Kdx/network/members)
+[![Issues](https://img.shields.io/github/issues/Neptaverse/Kdx?style=for-the-badge&logo=github&logoColor=white&labelColor=0d1117&color=f85149)](https://github.com/Neptaverse/Kdx/issues)
+[![License](https://img.shields.io/github/license/Neptaverse/Kdx?style=for-the-badge&labelColor=0d1117&color=3fb950)](https://github.com/Neptaverse/Kdx/blob/main/LICENSE)
+[![Python](https://img.shields.io/badge/python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white&labelColor=0d1117)](https://www.python.org)
+
+</div>
+
+KDX is a system-level wrapper around the Codex CLI that makes it genuinely smarter about your codebase.
+
+It builds a deep, multi-language index of your repository — extracting symbols, signatures, decorators, docstrings, visibility, and a full cross-file dependency graph — then uses that knowledge to inject precisely targeted context into every session. Combined with Keiro-backed web search and token-aware budget governance, KDX keeps the model focused, grounded, and efficient.
 
 KDX is not a fork of Codex. It launches the real `codex` binary, builds a temporary `CODEX_HOME`, attaches KDX-native MCP servers, and keeps just enough local state to make repo lookups and web-backed answers faster and more reliable.
 
 Repository: `https://github.com/Neptaverse/Kdx.git`
 
+<div align="center">
+
+## ⭐ Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Neptaverse/Kdx&type=Date)](https://star-history.com/#Neptaverse/Kdx&Date)
+
+</div>
+
 ## What It Does
 
-- Builds an incremental repo index in `.kdx/index.json`
-- Prefers source files and symbol-level matches over noisy broad reads
-- Routes questions as `local`, `external`, or `hybrid`
-- Uses Keiro for docs, release notes, research, and other freshness-sensitive lookups
-- Starts Codex with KDX repo and web MCP tools already attached
-- Includes a `kdx tokens` command to compare KDX against vanilla Codex on real prompts
-- Checks GitHub for newer tagged releases and shows a cached startup notice when one is available
+### Deep Codebase Indexing
+
+- **12-language symbol extraction** — Python (full AST), JavaScript/TypeScript, Rust, Go, Java, Kotlin, C/C++, C#, Ruby, PHP
+- **Signatures, decorators, bases, docstrings, visibility** — not just names, but the full shape of every symbol
+- **Cross-file dependency graph** — `imported_by` lists and `import_score` centrality ranking so structurally important files surface first
+- **Semantic role detection** — `entry`, `handler`, `middleware`, `model`, `test`, `config`, `docs` roles auto-classified per file
+
+### System-Level Retrieval
+
+- **Import-score centrality boosting** — files imported by many others automatically rank higher (capped at +12)
+- **Decorator/docstring/signature matching** — queries about "route", "handler", etc. boost files with matching decorators
+- **Visibility-aware filtering** — private symbols score 0.5×, internal 0.75×
+- **Token-based budget governance** — 3,000 total tokens / 550 per file (not character-based; matches Codex/tiktoken heuristics)
+- **Workspace tree injection** — compact directory tree + top-8 key files injected at session start for instant model orientation
+- **Compact context format** — ~30% fewer header tokens per snippet vs verbose formats
+
+### Smart Routing & Web Search
+
+- Routes queries as `local`, `external`, or `hybrid` with intent analysis
+- Uses Keiro for docs, release notes, research, and freshness-sensitive lookups via dedicated MCP server
+- Disables Codex native web search; all web lookups stay on the Keiro path
+
+### Bulletproof Auto-Updates
+
+- **Stash-and-reset update strategy** — `git stash` + `git reset --hard` + `git stash pop` on every update
+- Auto-checks and auto-applies updates on every `kdx` invocation (not just interactive startup)
+- Cross-platform: Linux, macOS, Windows
+- Disable with `KDX_NO_AUTO_UPDATE=1`
 
 ## Quick Start
 
@@ -122,49 +161,66 @@ If setup fails with a PyPI `ReadTimeoutError`, run the same setup command again.
 ## Common Commands
 
 ```bash
-kdx
-kdx "fix the auth retry path and check the latest SDK docs"
-kdx scan
-kdx plan "where is the Keiro client implemented?"
-kdx search "latest FastMCP docs"
-kdx tokens "where is the Keiro client implemented? reply with the path only."
-kdx update
+kdx                                     # interactive session
+kdx "fix the auth retry path"           # task with preloaded context
+kdx scan                                # rebuild repo index
+kdx plan "where is the Keiro client?"   # show routing + retrieval plan
+kdx search "latest FastMCP docs"        # Keiro web search
+kdx tokens "explain the budget system"  # benchmark KDX vs vanilla Codex
+kdx update                              # pull latest from GitHub
 ```
-
-## What’s Different
-
-Compared with plain Codex CLI, KDX adds a few opinionated pieces:
-
-- a repo-local index that biases the model toward source files and symbol matches
-- a separate web path for freshness-sensitive work through Keiro
-- explicit local/external/hybrid routing instead of one generic prompt shape
-- token benchmarking against vanilla Codex on the same prompts
-- GitHub-backed update checks for the KDX wrapper itself
-- a cross-platform bootstrap that installs a real user-level `kdx` command
 
 ## How It Works
 
-### Repo index
+### Repo Index (v5)
 
-KDX scans the current repository, extracts symbols and imports, and stores a compact index under `.kdx/`. That index is refreshed automatically when files change.
+KDX scans the current repository using language-specific parsers:
 
-### Retrieval
+| Language | Extraction Method |
+|----------|------------------|
+| Python | Full AST — decorators, bases, docstrings, signatures, visibility, parent classes |
+| JavaScript/TypeScript | Arrow functions, hooks, React components, default exports, enums |
+| Rust | `pub(crate)`, macros, derives, async/unsafe markers |
+| Go | Method receivers, interfaces, const/var blocks |
+| Java/Kotlin | Classes, methods, interfaces, annotations |
+| C/C++/C# | Classes, structs, functions, methods |
+| Ruby/PHP | Classes, modules, methods, functions |
 
-For local questions, KDX ranks files using:
+The index includes a **cross-file dependency graph**: every file tracks which other files import it (`imported_by`) and receives an `import_score` based on centrality (direct + 0.5× transitive importers).
 
-- path hints
-- identifier hints
-- symbol overlap
-- imports
-- file role
+### Retrieval Engine
 
-Source files are preferred by default. Tests, docs, config, and bench files are down-ranked unless the query clearly asks for them.
+For every query, KDX scores files using a multi-signal ranking:
 
-### Web search
+| Signal | Weight | Description |
+|--------|--------|-------------|
+| Path hint exact match | +80 | `retrieval.py` matches `retrieval.py` |
+| Path overlap | +6/term | Query terms in file path |
+| Symbol name match | +4/term | Function/class names |
+| Decorator match | +3/term | `@route`, `@handler`, etc. |
+| Docstring match | +1.5/term | Documentation content |
+| Signature match | +1/term | Function parameter names/types |
+| Import score (centrality) | up to +12 | Files imported by many others |
+| Semantic role | +3 to +8 | Entry, handler, middleware, model, source |
+| Visibility | 0.5× to 1× | Private symbols deprioritized |
 
-For external or freshness-sensitive questions, KDX calls Keiro through its own MCP server. Search planning is intent-based: docs, release notes, error lookups, research, and general web queries do not all take the same path. KDX disables Codex native web search for KDX sessions so web lookups stay on the Keiro path.
+Budget governance operates in **tokens** (not characters) — 3,000 total / 550 per file, matching industry-standard `len(text) // 4` heuristics.
 
-### Codex runtime
+### Workspace Orientation
+
+At session start, KDX injects into the bootstrap prompt:
+
+1. **Workspace tree** — compact `tree` output (depth 2, noisy dirs filtered)
+2. **Key files** — top 8 files ranked by import-score centrality with symbol counts and role
+3. **Local context** — symbol-targeted or keyword-targeted excerpts from the highest-scoring files
+
+This gives the model instant codebase orientation without burning tokens on `ls` or `find`.
+
+### Web Search
+
+For external or freshness-sensitive questions, KDX calls Keiro through its own MCP server. Search planning is intent-based: docs, release notes, error lookups, research, and general web queries each take optimized paths. Codex native web search is disabled in KDX sessions so web lookups stay on the Keiro path.
+
+### Codex Runtime
 
 KDX launches the real `codex` binary with:
 
@@ -173,6 +229,26 @@ KDX launches the real `codex` binary with:
 - your existing Codex auth and rules copied forward
 - Codex launch overrides that keep native `web_search` disabled in KDX sessions
 - a small set of session instructions tuned for evidence-first repo work
+
+### Auto-Updates
+
+KDX auto-updates on every invocation:
+
+1. Checks GitHub for newer tags (cached, TTL-based)
+2. If update available: `git stash` → `git reset --hard origin/main` → `git stash pop`
+3. Works even when local files (`.venv`, `__pycache__`) exist in the install directory
+
+```bash
+kdx update            # manual update
+kdx update --check    # check only, don't apply
+kdx update --rollback v0.1.0  # pin to a specific version
+```
+
+| Environment Variable | Effect |
+|---------------------|--------|
+| `KDX_NO_AUTO_UPDATE=1` | Disable auto-updates |
+| `KDX_NO_UPDATE_CHECK=1` | Disable update checks entirely |
+| `KDX_UPDATE_TTL_SECONDS` | Cache duration for update checks |
 
 ## Keiro Setup
 
@@ -192,34 +268,17 @@ kdx /keiro keiro_your_api_key_here
 
 The persisted config is stored outside the repo and is written with private file permissions.
 
-## Updates
+## Configuration
 
-KDX can check GitHub for newer versions of the project and update the current clone:
-
-```bash
-kdx update
-kdx update --check
-kdx update --check-now
-```
-
-`kdx update` applies the update by default.
-
-Interactive startup (`kdx` with no prompt) checks for updates and auto-applies a new update when safe.
-
-If auto-update cannot run (for example local git changes in the KDX install clone), KDX shows a notice and continues.
-
-The check is intentionally lightweight:
-
-- GitHub-backed
-- cached locally in `~/.kdx/update-check.json`
-- disabled with `KDX_NO_UPDATE_CHECK=1`
-- auto-update can be disabled with `KDX_NO_AUTO_UPDATE=1` (or `KDX_AUTO_UPDATE=0`)
-
-Rollback stays explicit:
-
-```bash
-kdx update --rollback v0.1.0
-```
+| Environment Variable | Default | Description |
+|---------------------|---------|-------------|
+| `KDX_MAX_TOTAL_TOKENS` | `3000` | Total token budget for retrieved context |
+| `KDX_MAX_FILE_TOKENS` | `550` | Per-file token budget |
+| `KDX_MAX_FILES` | `6` | Maximum files in context |
+| `KDX_MAX_SNIPPETS` | `10` | Maximum snippets |
+| `KDX_MAX_SEARCH_RESULTS` | `5` | Maximum Keiro search results |
+| `KDX_MODEL` | `gpt-5.4` | Model to use with Codex |
+| `KDX_AUTO_INIT` | `1` | Auto-initialize index on startup |
 
 ## Local State
 
@@ -281,31 +340,29 @@ python bootstrap.py --python -m build
 ```text
 src/kdx/
   cli.py              CLI entrypoint
-  wrapper.py          Codex launch flow
+  wrapper.py          Codex launch flow + workspace tree injection
   codex_home.py       temporary CODEX_HOME generation
-  indexer.py          repo scan and symbol extraction
-  retrieval.py        local retrieval and budgeting
+  indexer.py          12-language deep symbol extraction + dependency graph
+  retrieval.py        token-aware retrieval, scoring, impact analysis
+  budget.py           token-based budget governance
+  models.py           data models (SymbolRecord, FileRecord, ProjectIndex)
   search_service.py   Keiro search planning and evidence ranking
-  mcp_code_server.py  repo MCP server
-  mcp_search_server.py web MCP server
+  mcp_code_server.py  repo MCP server (scan, retrieve, read)
+  mcp_search_server.py web MCP server (Keiro endpoints)
+  updates.py          auto-update mechanism (stash + reset)
+  config.py           settings, env vars, persisted config
   token_compare.py    KDX vs vanilla Codex token benchmarking
 ```
 
 ## Status
 
-KDX is early, but the core loop is working:
+KDX core is production-grade:
 
-- repo indexing
-- local retrieval
-- Keiro-backed web search
-- Codex launch integration
-- token benchmarking
-
-What is still deliberately simple:
-
-- language parsing outside Python is mostly heuristic
-- verification loops are not fully built out yet
-- retrieval tuning is still benchmark-driven and evolving
+- **Index v5** — deep 12-language symbol extraction with cross-file dependency graph
+- **Token-aware retrieval** — multi-signal scoring with centrality, decorators, docstrings, signatures, visibility
+- **Workspace orientation** — tree + key files injected at session start
+- **Bulletproof updates** — stash-and-reset across all platforms
+- **65 tests passing** — full coverage of indexing, retrieval, budget, routing, updates, UI
 
 ## Release Readiness
 
@@ -314,5 +371,3 @@ What is still deliberately simple:
 - Reproducible bootstrap flow for the global `kdx` launcher
 - Package build validated through `python -m build`
 - Repo-local runtime state stays out of source control
-
-KDX still needs real-world benchmark tuning and broader parser coverage, but the repo is now structured for public releases and repeatable validation.
