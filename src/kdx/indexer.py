@@ -372,7 +372,6 @@ class _PySymbolVisitor(ast.NodeVisitor):
             visibility=self._visibility(node.name),
             parent=parent,
         ))
-        self._class_stack_copy = list(self._class_stack)
         self.generic_visit(node)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:

@@ -129,12 +129,13 @@ def build_server() -> Any:
     return mcp
 
 
-def main() -> None:
+def main() -> int:
     try:
         server = build_server()
         server.run()
     except KeiroError as exc:
         raise SystemExit(str(exc)) from exc
+    return 0
 
 
 if __name__ == "__main__":

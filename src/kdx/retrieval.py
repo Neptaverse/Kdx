@@ -452,19 +452,21 @@ def search_history(history_path: Path, query: str, limit: int = 5) -> list[Histo
 
 def impact_analysis(index: ProjectIndex, changed_files: list[str], limit: int = 10) -> list[dict[str, object]]:
     changed_set = set(changed_files)
+    changed_stems = {f.rsplit("/", 1)[-1].rsplit(".", 1)[0].lower() for f in changed_files}
     impacts: list[dict[str, object]] = []
     for record in index.files:
         if record.path in changed_set:
             continue
-        # Use real dependency graph: which changed files does this record import?
-        direct_hits = [f for f in record.imported_by if f in changed_set]
-        import_hits = [f for f in record.imports if any(f.endswith(c.rsplit('.', 1)[0]) or c.rsplit('/', 1)[-1].rsplit('.', 1)[0] in f for c in changed_set)]
-        all_reasons = sorted(set(direct_hits + import_hits))[:5]
+        # Files whose imported_by list includes changed files (direct dependents)
+        dependents = [f for f in record.imported_by if f in changed_set]
+        # Files whose own imports resolve to a changed file
+        import_hits = [imp for imp in record.imports if any(imp.endswith(stem) or stem in imp.lower() for stem in changed_stems)]
+        all_reasons = sorted(set(dependents + import_hits))[:5]
         if all_reasons:
             impacts.append({
                 "path": record.path,
                 "reasons": all_reasons,
-                "score": len(direct_hits) * 3 + len(import_hits) + (2 if record.is_test else 0),
+                "score": len(dependents) * 3 + len(import_hits) + (2 if record.is_test else 0),
                 "is_test": record.is_test,
             })
     impacts.sort(key=lambda item: (item["score"], item["is_test"]), reverse=True)
